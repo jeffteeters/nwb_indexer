@@ -264,19 +264,33 @@ def get_value_id(node):
 	nval = 0		# default values for number and string index
 	str_id = 0
 	if isinstance(node,h5py.Dataset):
+		# if "file_create_date" in node.name:
+		#	import pdb; pdb.set_trace()
 		size = node.size
-		is_numeric = np.issubdtype(node.dtype, np.number)
-		is_string = np.issubdtype(node.dtype, np.character) or isinstance(node, object)
-		if is_numeric:
+		if np.issubdtype(node.dtype, np.number):
+			vtype = "numeric"
+		elif np.issubdtype(node.dtype, np.character):
+			vtype = "string"
+		else:
+			try:
+				vlenType = h5py.check_dtype(vlen=node.dtype)
+			except:
+				vlenType = None
+			if vlenType in (bytes, str):
+				vtype = "vstring"
+			else:
+				print ("unable to determine type of dataset value")
+				import pdb; pdb.set_trace()
+		if vtype == "numeric":
 			if size == 1:
 				type_code = "n"	# n - single number
 				nval = float(node[()])
 			else:
 				type_code = "N"	# N - array
-		elif is_string:
+		elif vtype == "string" or vtype == "vstring":
 			if size <= 1:
 				type_code = "s"	# s - single string
-				sval = node[()]
+				sval = node[()] if vtype == "string" else node[0]
 				str_id = get_string_id(sval)
 			elif size < 20:
 				type_code = "S"	# S - array

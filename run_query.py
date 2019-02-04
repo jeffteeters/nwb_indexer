@@ -2,7 +2,11 @@ import sys
 import os
 import sqlite3
 import re
+import readline
 import parse
+readline.parse_and_bind('tab: complete')
+
+
 
 
 default_dbname="nwb_index.db"

@@ -3,10 +3,9 @@ import shlex
 
 # following worked:
 # /general/subject=(age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /=(file_create_date LIKE "2017-04")
-# Rule: if changing default search location, need to spedify new one using ploc:
 
 test_queries = """
-/general/subject: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epoch : start_time < 150
+/general/subject/: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epochs : start_time < 150
 """
 scratch = """
 /ploc_a: cloc_a1 <= 789 & (cloc_a2 >= 200 | cloc_a3 <= 100) | ploc_b: cloc_b1 >= 20 & cloc_b2 LIKE "Name: Smith" & ploc_c: cloc_c1 >= "34 ( : )"
@@ -106,6 +105,36 @@ def parse(query):
 	ti = {"tokens":tokens, "ttypes":ttypes, "plocs":plocs, "query":query}
 	return ti
 
+def get_parent_pattern(ploc):
+	# input is string before : in query
+	# possible ploc cases:
+	#	/ploc  - begin with slash, not at end.  Anchor to root.  Allow any location under. pattern = "/ploc%"
+	#	ploc/  - slash at end, not at front.  Item directly under ploc which may be anywhere.  pat = "%ploc"
+	#	/ploc/ - slash at front and end.  Anchor directly under item.  pat="ploc"
+	#	ploc   - slash not at start or end.  Find ploc anywhere in tree. pat="%ploc%"
+	#	/      - item following is directly under root.  pat=""
+	#	* or empty     - item following is anywhere in tree.  pat not used.
+	# In summary:
+	#	/ by itself, pat=""
+	#	* or empty - ignore
+	#	leading slash, no trailing slash: append "%" to suffix
+	#	trailing slash, no leading slash, prepend "%" to start
+	#	leading and trailing slash, don't prepend anything
+	#	no leading slash, no trailing slash -- append "%" to both leading and trailing
+	if ploc == "" or ploc == "*":
+		pattern = None
+	elif ploc == "/":
+		pattern = ""
+	else:
+		slash_at_start = ploc[0] == "/"
+		slash_at_end = ploc[-1] == "/"
+		pattern = ploc.strip("/")
+		if not slash_at_start:
+			pattern = "%" + pattern
+		if not slash_at_end:
+			pattern += "%"
+	return pattern
+
 
 def make_sql(ti):
 	# generate sql to perform query
@@ -135,16 +164,10 @@ def make_sql(ti):
 		sql_from.append("grp as %sg" % ploc_alias_base)
 		sql_from.append("path as %sp" % ploc_alias_base)
 		sql_where.append("%sg.path_id = %sp.id" % (ploc_alias_base, ploc_alias_base))
-		if ploc != "":
+		ppat = get_parent_pattern(ploc)
+		if ppat:
 			# include search pattern for parent group
-			if ploc[0] == "/":
-				# '/' specified.  Remove it.  Require exact match to name.  (anchored search)
-				pattern = ploc.strip("/")
-				sql_where.append("%sp.name = '%s'" % (ploc_alias_base, pattern))
-			else:
-				# '/' not specified.  Add prefix %/ to search anywhere in file
-				pattern = "%" + ploc.strip("/")
-				sql_where.append("%sp.name LIKE '%s'" % (ploc_alias_base, pattern))
+			sql_where.append("%sp.name LIKE '%s'" % (ploc_alias_base, ppat))
 		sql_where.append("%sg.file_id = f.id" % ploc_alias_base) 
 		for ic in range(1, len(plocs)):
 			cti = plocs[ic]  # child token index
