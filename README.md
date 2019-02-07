@@ -96,7 +96,9 @@ Found 16:
 `/general/subject/: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs : start_time < 150`
 
 (This is equivalant to the following query in the NWB Query Engine):
+
 `/general/subject/= (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /=(file_create_date LIKE "2017-04") & /epochs=(start_time < 150)`
+
 Output:
 ```
 Found 2:
