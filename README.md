@@ -90,7 +90,8 @@ Found 16:
 13. ('../sample_data/data_structure_ANM210862_20130628.nwb', '', 'file_create_date', '2017-04-24T11:32:54.170415')
 14. ('../sample_data/data_structure_ANM214429_20130807.nwb', '', 'file_create_date', '2017-04-24T11:32:55.515740')
 15. ('../sample_data/data_structure_ANM214429_20130806.nwb', '', 'file_create_date', '2017-04-24T11:32:54.174653')
-16. ('../sample_data/data_structure_ANM214429_20130805.nwb', '', 'file_create_date', '2017-04-24T11:32:55.174861')```
+16. ('../sample_data/data_structure_ANM214429_20130805.nwb', '', 'file_create_date', '2017-04-24T11:32:55.174861')
+```
 
 `/general/subject/: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs : start_time < 150`
 
@@ -104,7 +105,8 @@ Found 2:
 `/general/subject/: (age LIKE "3 months 16 days%" & species LIKE "Mus musculus") & /:session_start_time < "Thu Jun 27 2013 12" & /epochs : start_time < 250`
 
 Output:
-```Found 1:
+```
+Found 1:
 1. ('../sample_data/data_structure_ANM210862_20130627.nwb', 'general/subject', 'age', '3 months 16 days  weeks', 'species', 'Mus musculus', '', 'session_start_time', 'Thu Jun 27 2013 10:36:32', 'epochs/trial_001', 'start_time', 2.284463)
 ```
 
