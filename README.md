@@ -34,7 +34,7 @@ step 1.  (Default is "nwb_index.db").
 
 
 Queries are entered using the format described in the NWB Query Engine paper, except that:
-* ":" is used instead of "=", and the parentheses are not required.  (This specifies the "parent location").
+* ":" is used instead of "=", and the parentheses are not required.  (I call the location before the ":", the "parent location").
 * The parent location and ":" can be left off, which is the same as parent location == "*" (search entire tree).
 * String constants must always be enclosed in either single or doulble quotes.
 * Any string constant used with LIKE must have wildcards ("%" or "_") explicitly included (if no wildcards are included, the query does an exact match).
@@ -51,7 +51,8 @@ child value being searched for is a group attribute, dataset attribute or datase
 `/:session_start_time LIKE "%Jun __ 2013%"`
 
 Output:
-```Found 6:
+```
+Found 6:
 1. ('../sample_data/data_structure_ANM210862_20130627.nwb', '', 'session_start_time', 'Thu Jun 27 2013 10:36:32')
 2. ('../sample_data/data_structure_ANM210862_20130626.nwb', '', 'session_start_time', 'Wed Jun 26 2013 10:44:32')
 3. ('../sample_data/data_structure_ANM210863_20130626.nwb', '', 'session_start_time', 'Wed Jun 26 2013 12:23:37')
@@ -63,19 +64,33 @@ Output:
 `epochs:(start_time>200 & stop_time<210)`
 
 Output:
-```Found 2:
+```
+Found 2:
 1. ('../sample_data/data_structure_ANM214429_20130807.nwb', 'epochs/trial_015', 'start_time', 200.719654, 'stop_time', 208.157124)
 2. ('../sample_data/data_structure_ANM214429_20130806.nwb', 'epochs/trial_268', 'start_time', 3317.152814, 'stop_time', 2.683177)```
+```
 
 `/:file_create_date LIKE "%"`
 
 Output:
-```Found 16:
+```
+Found 16:
 1. ('../sample_data/data_structure_ANM210861_20130701.nwb', '', 'file_create_date', '2017-04-24T11:32:54.281831')
 2. ('../sample_data/data_structure_ANM210861_20130702.nwb', '', 'file_create_date', '2017-04-24T11:32:54.225763')
-...
-16. ('../sample_data/data_structure_ANM214429_20130805.nwb', '', 'file_create_date', '2017-04-24T11:32:55.174861')
-```
+3. ('../sample_data/data_structure_ANM210861_20130703.nwb', '', 'file_create_date', '2017-04-24T11:32:53.889109')
+4. ('../sample_data/data_structure_ANM214427_20130805.nwb', '', 'file_create_date', '2017-04-24T11:32:55.180281')
+5. ('../sample_data/data_structure_ANM214427_20130807.nwb', '', 'file_create_date', '2017-04-24T11:32:54.249098')
+6. ('../sample_data/data_structure_ANM210862_20130627.nwb', '', 'file_create_date', '2017-04-24T11:32:54.215883')
+7. ('../sample_data/data_structure_ANM210862_20130626.nwb', '', 'file_create_date', '2017-04-24T11:32:54.063820')
+8. ('../sample_data/data_structure_ANM214427_20130806.nwb', '', 'file_create_date', '2017-04-24T11:32:54.223924')
+9. ('../sample_data/data_structure_ANM210863_20130626.nwb', '', 'file_create_date', '2017-04-24T11:32:54.216323')
+10. ('../sample_data/data_structure_ANM210863_20130627.nwb', '', 'file_create_date', '2017-04-24T11:32:54.076284')
+11. ('../sample_data/data_structure_ANM210863_20130628.nwb', '', 'file_create_date', '2017-04-24T11:32:54.170602')
+12. ('../sample_data/data_structure_ANM214427_20130808.nwb', '', 'file_create_date', '2017-04-24T11:32:55.170812')
+13. ('../sample_data/data_structure_ANM210862_20130628.nwb', '', 'file_create_date', '2017-04-24T11:32:54.170415')
+14. ('../sample_data/data_structure_ANM214429_20130807.nwb', '', 'file_create_date', '2017-04-24T11:32:55.515740')
+15. ('../sample_data/data_structure_ANM214429_20130806.nwb', '', 'file_create_date', '2017-04-24T11:32:54.174653')
+16. ('../sample_data/data_structure_ANM214429_20130805.nwb', '', 'file_create_date', '2017-04-24T11:32:55.174861')```
 
 `/general/subject/: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs : start_time < 150`
 
