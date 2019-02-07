@@ -277,7 +277,22 @@ def get_value_id(node):
 			except:
 				vlenType = None
 			if vlenType in (bytes, str):
-				vtype = "vstring"
+				if node.shape == ():
+					# simple string in object.  Get value by node[()]
+					vtype = "string"
+				else:
+					# sting in array in object.  Get value by node[0]
+					vtype = "vstring"
+				# try:
+				# 	node0 = node[0]
+				# except:
+				# 	print ("unable to get first element from vstring")
+				# 	import pdb; pdb.set_trace()
+			elif size > 0 and isinstance(node[0], h5py.Reference):
+				# found array of object references
+				vtype = "reference"
+			elif size > 0 and isinstance(node[0], np.void):
+				vtype = "reference"  # example: node[0] = (2, 2, <HDF5 object reference>)
 			else:
 				print ("unable to determine type of dataset value")
 				import pdb; pdb.set_trace()
@@ -291,12 +306,15 @@ def get_value_id(node):
 			if size <= 1:
 				type_code = "s"	# s - single string
 				sval = node[()] if vtype == "string" else node[0]
+				if isinstance(sval, bytes):
+					sval = sval.decode("utf-8")  # store as string, not bytes
 				str_id = get_string_id(sval)
 			elif size < 20:
 				type_code = "S"	# S - array
 				vlist = node.value.tolist()
 				if isinstance(vlist[0], bytes):
 					sval = b"'" + b"'".join(vlist) + b"'"	# join bytes
+					sval = sval.decode("utf-8")
 					str_id = get_string_id(sval)
 				elif isinstance(vlist[0], str):
 					sval = "'" + "'".join(vlist) + "'"	# join characters
@@ -306,6 +324,8 @@ def get_value_id(node):
 					count_unknown_type(str(type(vlist[0])) + "-" + type_code)
 			else:
 				type_code = "T"	# T - Too big string array
+		elif vtype == "reference":
+			type_code = "R"  # R - array of object references
 		else:
 			import pdb; pdb.set_trace()
 			sys.exit("%s, unknown value type: %s" % (node.name, node.dtype))
