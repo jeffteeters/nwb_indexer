@@ -34,10 +34,10 @@ create table grp (				-- hdf5 group
 create table dataset (			-- hdf5 dataset
 	id integer primary key,
 	file_id integer not null,
-	parent_id integer not null,	-- id of parent group
-	path_id integer not null,	-- name of dataset within group
+	group_id integer not null,	-- id of parent group
+	name_id integer not null,	-- name of dataset within group
 	value_id integer not null,
-	unique (file_id, parent_id, path_id)
+	unique (file_id, group_id, name_id)
 );
 
 create table group_attribute (	-- group attributes
@@ -191,12 +191,12 @@ def save_group(name, node):
 def save_dataset(name, node):
 	global con, cur, file_id
 	# full_name = node.name
-	parent_id = get_parent_id(name)
+	group_id = get_parent_id(name)  # id of parent group
 	parent_name, ds_name = os.path.split(name)
-	path_id = get_path_id(ds_name)
+	name_id = get_path_id(ds_name)
 	value_id = get_value_id(node)
-	cur.execute("insert into dataset (file_id, path_id, parent_id, value_id) values (?, ?, ?, ?)", 
-			(file_id, path_id, parent_id, value_id))
+	cur.execute("insert into dataset (file_id, group_id, name_id, value_id) values (?, ?, ?, ?)", 
+			(file_id, group_id, name_id, value_id))
 	con.commit()
 	dataset_id = cur.lastrowid
 	# save attributes

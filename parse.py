@@ -135,6 +135,18 @@ def get_parent_pattern(ploc):
 			pattern += "%"
 	return pattern
 
+def NOT_USED_get_node_type(loc, default):
+	# implements quick way to specify group, dataset or attribute by appending "G", "D" or "A" to location name
+	codes = {"G": "group", "D": "dataset", "A": "attribute"}
+	assert default in codes.values(), "get_node_type default must be one of: '%s', found '%s'" % (code.values(), default)
+	if len(loc) > 0:
+		if loc[-1] in codes.keys():
+			node_type = codes(loc[-1])
+			loc = loc[0:-1]	// strip off suffix code character
+		else:
+			node_type = default
+	return (loc, node_type)
+
 
 def make_sql(ti):
 	# generate sql to perform query
@@ -158,6 +170,8 @@ def make_sql(ti):
 	for ipl in range(len(ti['plocs'])):
 		plocs = ti['plocs'][ipl]
 		ploc = plocs[0]   # name of parent location
+		# (ploc, ploc_node_type) = get_node_type(ploc, "group")	# default is group
+		# assert ploc_node_type != "attribute", "Cannot specify parent location node as attribute (A): %s" % ploc
 		ipl_alpha = alphabet[ipl]  # e.g. "a", "b", "c", ...
 		ploc_alias_base = "b" + ipl_alpha	# e.g. "ba" for 1st parent, "bb" for 2nd parent, ...
 		sql_select.append("%sp.name as group_%s" % (ploc_alias_base, ipl_alpha))
@@ -187,8 +201,8 @@ def make_sql(ti):
 			if isstring:
 				sql_from.append("string as %ss" % cloc_alias_base)
 				sql_where.append("%sv.str_id = %ss.id" % (cloc_alias_base, cloc_alias_base))
-			sql_where.append("%sd.parent_id = %sg.id" % (cloc_alias_base, ploc_alias_base))
-			sql_where.append("%sd.path_id = %sp.id" % (cloc_alias_base, cloc_alias_base))
+			sql_where.append("%sd.group_id = %sg.id" % (cloc_alias_base, ploc_alias_base))
+			sql_where.append("%sd.name_id = %sp.id" % (cloc_alias_base, cloc_alias_base))
 			sql_where.append("%sd.value_id = %sv.id" % (cloc_alias_base, cloc_alias_base))
 			sql_where.append("%sp.name = '%s'" % (cloc_alias_base, tokens[cti]))
 			# replace string in tokens with sql to retrieve value, either numeric or string
