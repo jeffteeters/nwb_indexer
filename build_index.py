@@ -54,11 +54,20 @@ create table dataset_attribute (
 	primary key (dataset_id, name_id)
 );
 
+create table node (  -- stores groups, dataseta AND attributes
+	id integer primary key,
+	file_id integer not null,
+	parent_id integer not null, -- parent group (if group or dataset) or parent group or dataset (if attribute)
+	path_id integer not null,	-- path to this node (group, dataset or attribute)
+	node_type char(1) not null,	-- either: g-group, d-dataset, a-attribute
+	value_id integer not null	-- value associated with dataset or attribute
+);
+
 create table value (			-- value of dataset or attribute
 	id integer primary key,
 	type char(1) not null,  -- either: n-number, s-string, N-number array, S-string array
-	nval real,             -- contains value of number, if number
-	str_id integer          -- index to string id if string, or string array
+	nval real not null,     -- contains value of number, if number
+	str_id integer not null -- index to string id if string, or string array; otherwise 0
 );
 
 create table string (
@@ -71,9 +80,9 @@ def open_database():
 	global dbname, schema
 	global con, cur
 	# this for development so don't have to manually delete database between every run
-	if os.path.isfile(dbname):
-		print("Removing existing %s" % dbname)
-		os.remove(dbname)
+	# if os.path.isfile(dbname):
+	# 	print("Removing existing %s" % dbname)
+	# 	os.remove(dbname)
 	if not os.path.isfile(dbname):
 		print("Creating database '%s'" % dbname)
 		con = sqlite3.connect(dbname)
@@ -118,22 +127,46 @@ def get_path_id(name):
 		path_id = row[0]
 	return path_id
 
-def get_file_id(name):
+def find_file_id(name):
+	# return file_id if have file in database, otherwise None
 	global con, cur
 	path_id = get_path_id(name)
 	cur.execute("select id from file where path_id = ?", (path_id,))
 	row = cur.fetchone()
 	if row is None:
+		file_id = None
+	else:
+		file_id = row[0]
+	return file_id
+
+def get_file_id(name):
+	global con, cur
+	file_id = find_file_id(name)
+	if file_id is None:
+		path_id = get_path_id(name)
 		cur.execute("insert into file (path_id) values (?)", (path_id,))
 		con.commit()
 		file_id = cur.lastrowid
-	else:
-		# file name was already in file
-		file_id = row[0]
 	print("file_id is %i" % file_id)
 	return file_id
 
-def get_group_id(name):
+
+# def save_node(name, node):
+# 	global con, cur, file_id
+# 	# full_name = node.name
+# 	parent_id = get_parent_id(name)
+# 	path_id = get_path_id(name)
+# 	cur.execute("insert into node (file_id, path_id, parent_id) values (?, ?, ?)", 
+# 			(file_id, path_id, parent_id))
+# 	con.commit()
+# 	group_id = cur.lastrowid
+# 	# save attributes
+# 	for key in node.attrs:
+# 		value = node.attrs[key]
+# 		save_group_attribute(group_id, key, value)
+# 	return group_id
+
+def not_used_get_group_id(name):
 	global con, cur, file_id
 	path_id = get_path_id(name)
 	group_id = None  # return None if group with this name does not exist (don't add it)
@@ -142,6 +175,17 @@ def get_group_id(name):
 	if row is not None:
 		group_id = row[0]
 	return group_id
+
+# def find_parent_id(name):
+# 	global con, cur, file_id
+# 	path_id = get_path_id(name)
+# 	parent_id = None  # return None if node with this name does not exist (don't add it)
+# 	cur.execute("select id from node where file_id = ? and path_id = ?", (file_id, path_id,))
+# 	row = cur.fetchone()
+# 	if row is not None:
+# 		parent_id = row[0]
+# 	return parent_id
+
 
 # def save_group(name):
 # 	global con, cur, file_id
@@ -168,12 +212,27 @@ def get_parent_id(name):
 		parent_id = 0  # root has no parent
 	else:
 		parent_name, name2 = os.path.split(name)
+		path_id = get_path_id(parent_name)
+		cur.execute("select id from node where file_id = ? and path_id = ?", (file_id, path_id,))
+		row = cur.fetchone()
+		if row is not None:
+			parent_id = row[0]
+		else:
+			sys.exit("Unable to find parent for: '%s'" % name)
+	return parent_id
+
+def old_get_parent_id(name):
+	global con, cur, file_id
+	if name == "":
+		parent_id = 0  # root has no parent
+	else:
+		parent_name, name2 = os.path.split(name)
 		# assert name == name2, "name %s ~= %s, parent_name=%s, in get_parent_id for %s" % (name, name2, parent_name, full_name)
 		parent_id = get_group_id(parent_name)
 		assert parent_id is not None, "Unable to find parent for: '%s'" % name
 	return parent_id
 
-def save_group(name, node):
+def old_save_group(name, node):
 	global con, cur, file_id
 	# full_name = node.name
 	parent_id = get_parent_id(name)
@@ -188,7 +247,25 @@ def save_group(name, node):
 		save_group_attribute(group_id, key, value)
 	return group_id
 
-def save_dataset(name, node):
+def save_group(name, node):
+	global con, cur, file_id
+	# full_name = node.name
+	parent_id = get_parent_id(name)
+	path_id = get_path_id(name)
+	node_type = "g"		# indicates group
+	value_id = 0
+	cur.execute("insert into node (file_id, parent_id, path_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
+			(file_id, parent_id, path_id, node_type, value_id))
+	con.commit()
+	group_id = cur.lastrowid
+	# save attributes
+	for key in node.attrs:
+		value = node.attrs[key]
+		full_path = name + "/" + key
+		save_node_attribute(group_id, full_path, value)
+	return group_id
+
+def old_save_dataset(name, node):
 	global con, cur, file_id
 	# full_name = node.name
 	group_id = get_parent_id(name)  # id of parent group
@@ -205,12 +282,42 @@ def save_dataset(name, node):
 		save_dataset_attribute(dataset_id, key, value)
 	return dataset_id
 
+def save_dataset(name, node):
+	global con, cur, file_id
+	# full_name = node.name
+	parent_id = get_parent_id(name)  # id of parent group
+	# parent_name, ds_name = os.path.split(name)
+	path_id = get_path_id(name)
+	value_id = get_value_id(node)
+	node_type = "d"  # dataset
+	cur.execute("insert into node (file_id, parent_id, path_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
+			(file_id, parent_id, path_id, node_type, value_id))
+	con.commit()
+	dataset_id = cur.lastrowid
+	# save attributes
+	for key in node.attrs:
+		value = node.attrs[key]
+		full_path = name + "/" + key
+		save_node_attribute(dataset_id, full_path, value)
+	return dataset_id
+
+def save_node_attribute(parent_id, attribute_path, value):
+	global con, cur, file_id
+	path_id = get_path_id(attribute_path)
+	value_id = get_value_id(value)
+	node_type = "a"		# indicates attribute
+	cur.execute("insert into node (file_id, parent_id, path_id, node_type, value_id) values (?, ?, ?, ?, ?)",
+		(file_id, parent_id, path_id, node_type, value_id))
+	con.commit()
+
 count = 0;
 def save_node(name, node):
 	global count
 	if isinstance(node,h5py.Group):
+		# old_save_group(name, node)
 		save_group(name, node)
 	elif isinstance(node,h5py.Dataset):
+		# old_save_dataset(name, node)
 		save_dataset(name, node)
 	else:
 		sys.exit("Unknown node type in save_node: %s" % node)
@@ -266,6 +373,8 @@ def get_value_id(node):
 	if isinstance(node,h5py.Dataset):
 		# if "file_create_date" in node.name:
 		#	import pdb; pdb.set_trace()
+		# if "general/specifications" in node.name:
+		# 	import pdb; pdb.set_trace();
 		size = node.size
 		if np.issubdtype(node.dtype, np.number):
 			vtype = "numeric"
@@ -300,25 +409,37 @@ def get_value_id(node):
 			if size == 1:
 				type_code = "n"	# n - single number
 				nval = float(node[()])
+				if math.isnan(nval):
+					nval="nan"
 			else:
 				type_code = "N"	# N - array
 		elif vtype == "string" or vtype == "vstring":
 			if size <= 1:
-				type_code = "s"	# s - single string
 				sval = node[()] if vtype == "string" else node[0]
 				if isinstance(sval, bytes):
 					sval = sval.decode("utf-8")  # store as string, not bytes
-				str_id = get_string_id(sval)
+				if len(sval) < 10000:
+					type_code = "s"	# s - single string
+					str_id = get_string_id(sval)
+				else:
+					type_code = "W"	# flag single string too long
 			elif size < 20:
-				type_code = "S"	# S - array
 				vlist = node.value.tolist()
 				if isinstance(vlist[0], bytes):
 					sval = b"'" + b"'".join(vlist) + b"'"	# join bytes
 					sval = sval.decode("utf-8")
-					str_id = get_string_id(sval)
+					if len(sval) < 10000:
+						type_code = "S"	# S - array
+						str_id = get_string_id(sval)
+					else:
+						type_code = "U" # flag array string too long
 				elif isinstance(vlist[0], str):
 					sval = "'" + "'".join(vlist) + "'"	# join characters
-					str_id = get_string_id(sval)
+					if len(sval) < 10000:
+						type_code = "S"	# S - array
+						str_id = get_string_id(sval)
+					else:
+						type_code = "U" # flag array string too long
 				else:
 					type_code = "V"	# unknown type in vlist
 					count_unknown_type(str(type(vlist[0])) + "-" + type_code)
@@ -345,6 +466,8 @@ def get_value_id(node):
 			if size <= 1:
 				type_code = "s"	# s - single string
 				sval = node
+				if isinstance(sval, bytes):
+					sval = sval.decode("utf-8")
 				str_id = get_string_id(sval)
 			elif size < 20:
 				type_code = "S"	# S - array
@@ -354,6 +477,7 @@ def get_value_id(node):
 					import pdb; pdb.set_trace()
 				if isinstance(vlist[0], bytes):
 					sval = b"'" + b"'".join(vlist) + b"'"	# join bytes
+					sval = sval.decode("utf-8")
 				else:
 					sval = "'" + "'".join(vlist) + "'"	# join characters
 				str_id = get_string_id(sval)
@@ -364,6 +488,8 @@ def get_value_id(node):
 		if isinstance(node, (bytes, str)):
 			type_code = "s"	# s - single string
 			sval = node
+			if isinstance(sval, bytes):
+				sval = sval.decode("utf-8")
 			str_id = get_string_id(sval)
 		elif isinstance(node, (list, tuple)):
 			if len(node) > 0:
@@ -372,6 +498,7 @@ def get_value_id(node):
 						type_code = "S"	# S - array
 						if isinstance(vlist[0], bytes):
 							sval = b"'" + b"'".join(vlist) + b"'"	# join bytes
+							sval = sval.decode("utf-8")
 						else:
 							sval = "'" + "'".join(vlist) + "'"	# join characters
 						str_id = get_string_id(sval)
@@ -387,6 +514,8 @@ def get_value_id(node):
 						# import pdb; pdb.set_trace()
 		elif isinstance(node, (int, float)):
 			nval = float(node)
+			if math.isnan(nval):
+				nval="nan"
 			type_code = "n"
 		else:
 			type_code = "u"	# unknown single value
@@ -396,8 +525,11 @@ def get_value_id(node):
 	cur.execute("select id from value where type=? and nval=? and str_id=?", (type_code, nval, str_id))
 	row = cur.fetchone()
 	if row is None:
-		cur.execute("insert into value (type, nval, str_id) values (?, ?, ?)", (type_code, nval, str_id))
-		con.commit()
+		try:
+			cur.execute("insert into value (type, nval, str_id) values (?, ?, ?)", (type_code, nval, str_id))
+			con.commit()
+		except:
+			import pdb; pdb.set_trace()
 		value_id = cur.lastrowid
 	else:
 		value_id = row[0]
@@ -418,7 +550,11 @@ def get_string_id(sval):
 
 def scan_file(path):
 	global file_id
-	print ("Scanning file %s" % path)
+	file_id = find_file_id(path)
+	if file_id is not None:
+		print("Skipping (already indexed): %i. %s" % (file_id, path))
+		return
+	print ("Scanning %s" % path)
 	clear_unknown_types()
 	fp = h5py.File(path, "r")
 	if not fp:

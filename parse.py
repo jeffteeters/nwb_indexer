@@ -142,11 +142,10 @@ def NOT_USED_get_node_type(loc, default):
 	if len(loc) > 0:
 		if loc[-1] in codes.keys():
 			node_type = codes(loc[-1])
-			loc = loc[0:-1]	// strip off suffix code character
+			loc = loc[0:-1]	# strip off suffix code character
 		else:
 			node_type = default
 	return (loc, node_type)
-
 
 def make_sql(ti):
 	# generate sql to perform query
@@ -175,7 +174,7 @@ def make_sql(ti):
 		ipl_alpha = alphabet[ipl]  # e.g. "a", "b", "c", ...
 		ploc_alias_base = "b" + ipl_alpha	# e.g. "ba" for 1st parent, "bb" for 2nd parent, ...
 		sql_select.append("%sp.name as group_%s" % (ploc_alias_base, ipl_alpha))
-		sql_from.append("grp as %sg" % ploc_alias_base)
+		sql_from.append("node as %sg" % ploc_alias_base)
 		sql_from.append("path as %sp" % ploc_alias_base)
 		sql_where.append("%sg.path_id = %sp.id" % (ploc_alias_base, ploc_alias_base))
 		ppat = get_parent_pattern(ploc)
@@ -195,16 +194,16 @@ def make_sql(ti):
 				sql_select.append("%ss.value as %s%i_value" % (cloc_alias_base, ipl_alpha, ic))
 			else:
 				sql_select.append("%sv.nval as %s%i_value" % (cloc_alias_base, ipl_alpha, ic))
-			sql_from.append("dataset as %sd" % cloc_alias_base)
+			sql_from.append("node as %sd" % cloc_alias_base)
 			sql_from.append("path as %sp" % cloc_alias_base)
 			sql_from.append("value as %sv" % cloc_alias_base)
 			if isstring:
 				sql_from.append("string as %ss" % cloc_alias_base)
 				sql_where.append("%sv.str_id = %ss.id" % (cloc_alias_base, cloc_alias_base))
-			sql_where.append("%sd.group_id = %sg.id" % (cloc_alias_base, ploc_alias_base))
-			sql_where.append("%sd.name_id = %sp.id" % (cloc_alias_base, cloc_alias_base))
+			sql_where.append("%sd.parent_id = %sg.id" % (cloc_alias_base, ploc_alias_base))
+			sql_where.append("%sd.path_id = %sp.id" % (cloc_alias_base, cloc_alias_base))
 			sql_where.append("%sd.value_id = %sv.id" % (cloc_alias_base, cloc_alias_base))
-			sql_where.append("%sp.name = '%s'" % (cloc_alias_base, tokens[cti]))
+			sql_where.append("%sp.name LIKE '%s'" % (cloc_alias_base, "%" + tokens[cti]))
 			# replace string in tokens with sql to retrieve value, either numeric or string
 			if isstring:
 				tokens[cti] = "%ss.value" % cloc_alias_base
