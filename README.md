@@ -45,7 +45,7 @@ The database schema (given in file "build_index.py" might need to be changed to 
 both groups and datasets.  Or there might need to be a way to specify explicitly whether the
 child value being searched for is a group attribute, dataset attribute or dataset value.
 
-#### Example queries:
+#### Example queries (Datasets):
 (Using same datasets at the NWB Query Engine test site: http://eeg.kiv.zcu.cz:8080/nwb-query-engine-web/)
 
 `/:session_start_time LIKE "%Jun __ 2013%"`
@@ -113,6 +113,43 @@ Output:
 Found 1:
 1. ('../sample_data/data_structure_ANM210862_20130627.nwb', 'general/subject', 'age', '3 months 16 days  weeks', 'species', 'Mus musculus', '', 'session_start_time', 'Thu Jun 27 2013 10:36:32', 'epochs/trial_001', 'start_time', 2.284463)
 ```
+
+#### Example queries (Attributes)
+
+`/acquisition/timeseries:neurodata_type LIKE "TimeSeries"`
+
+Output (two are pynwb sample files):
+```
+Found 18:
+1. ('../sample_data/data_structure_ANM210861_20130701.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+2. ('../sample_data/data_structure_ANM210861_20130702.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+3. ('../sample_data/data_structure_ANM210861_20130703.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+4. ('../sample_data/data_structure_ANM214427_20130805.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+5. ('../sample_data/data_structure_ANM214427_20130807.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+6. ('../sample_data/data_structure_ANM210862_20130627.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+7. ('../sample_data/data_structure_ANM210862_20130626.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+8. ('../sample_data/data_structure_ANM214427_20130806.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+9. ('../sample_data/data_structure_ANM210863_20130626.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+10. ('../sample_data/data_structure_ANM210863_20130627.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+11. ('../sample_data/data_structure_ANM210863_20130628.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+12. ('../sample_data/data_structure_ANM214427_20130808.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+13. ('../sample_data/data_structure_ANM210862_20130628.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+14. ('../sample_data/data_structure_ANM214429_20130807.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+15. ('../sample_data/data_structure_ANM214429_20130806.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+16. ('../sample_data/data_structure_ANM214429_20130805.nwb', 'acquisition/timeseries/lick_trace', 'acquisition/timeseries/lick_trace/neurodata_type', 'TimeSeries')
+17. ('../pynwb_examples/tutorials_python/domain/ophys_experiment_data_orig/562095852.nwb', 'acquisition/timeseries/2p_image_series', 'acquisition/timeseries/2p_image_series/neurodata_type', 'TimeSeries')
+18. ('../pynwb_examples/tutorials_python/domain/ophys_experiment_data/562095852.nwb', 'acquisition/timeseries/2p_image_series', 'acquisition/timeseries/2p_image_series/neurodata_type', 'TimeSeries')
+```
+
+`/processing:neurodata_type LIKE "ROIResponseSeries"`
+
+Output (pynwb sample files):
+```
+Found 2:
+1. ('../pynwb_examples/tutorials_python/domain/brain_observatory.nwb', 'processing/ophys_module/dff_interface/df_over_f', 'processing/ophys_module/dff_interface/df_over_f/neurodata_type', 'RoiResponseSeries')
+2. ('../pynwb_examples/tutorials_python/domain/ophys_example.nwb', 'processing/my_ca_imaging_module/Fluorescence/my_rrs', 'processing/my_ca_imaging_module/Fluorescence/my_rrs/neurodata_type', 'RoiResponseSeries')
+```
+
 
 
 
