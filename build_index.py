@@ -23,37 +23,6 @@ create table file (				-- hdf5 files
 	path_id integer not null
 );
 
-create table grp (				-- hdf5 group
-	id integer primary key,
-	file_id integer not null,
-	path_id integer not null,
-	parent_id integer not null,	-- id of parent group, 0 if root
-	unique (file_id, path_id)
-);
-
-create table dataset (			-- hdf5 dataset
-	id integer primary key,
-	file_id integer not null,
-	group_id integer not null,	-- id of parent group
-	name_id integer not null,	-- name of dataset within group
-	value_id integer not null,
-	unique (file_id, group_id, name_id)
-);
-
-create table group_attribute (	-- group attributes
-	group_id integer not null,
-	name_id integer not null,	-- name of attribute within group
-	value_id integer not null,
-	primary key (group_id, name_id)
-);
-
-create table dataset_attribute (
-	dataset_id integer not null,
-	name_id integer not null,  -- name of attribute within dataset
-	value_id integer not null,
-	primary key (dataset_id, name_id)
-);
-
 create table node (  -- stores groups, dataseta AND attributes
 	id integer primary key,
 	file_id integer not null,
@@ -79,10 +48,6 @@ create table string (
 def open_database():
 	global dbname, schema
 	global con, cur
-	# this for development so don't have to manually delete database between every run
-	# if os.path.isfile(dbname):
-	# 	print("Removing existing %s" % dbname)
-	# 	os.remove(dbname)
 	if not os.path.isfile(dbname):
 		print("Creating database '%s'" % dbname)
 		con = sqlite3.connect(dbname)
@@ -93,27 +58,6 @@ def open_database():
 		con = sqlite3.connect(dbname)
 		cur = con.cursor()
 
-
-# def get_path_id(name):
-# 	global con, cur
-# 	cur.execute("select id from path where name=?", (name,))
-# 	row = cur.fetchone()
-# 	if row is None:
-# 		path_id = None
-# 	else:
-# 		path_id = row[0]
-# 	return path_id
-
-# def save_path(name):
-# 	global con, cur
-# 	path_id = get_path_id(name)
-# 	if path_id is None:
-# 		cur.execute("insert into path (name) values (?)", (name,))
-# 		con.commit()
-# 		path_id = cur.lastrowid
-# 	return path_id
-
-
 def get_path_id(name):
 	global con, cur
 	cur.execute("select id from path where name=?", (name,))
@@ -123,7 +67,7 @@ def get_path_id(name):
 		con.commit()
 		path_id = cur.lastrowid
 	else:
-		# file name was already in file
+		# name was already stored
 		path_id = row[0]
 	return path_id
 
@@ -150,62 +94,6 @@ def get_file_id(name):
 	print("file_id is %i" % file_id)
 	return file_id
 
-
-# def save_node(name, node):
-# 	global con, cur, file_id
-# 	# full_name = node.name
-# 	parent_id = get_parent_id(name)
-# 	path_id = get_path_id(name)
-# 	cur.execute("insert into node (file_id, path_id, parent_id) values (?, ?, ?)", 
-# 			(file_id, path_id, parent_id))
-# 	con.commit()
-# 	group_id = cur.lastrowid
-# 	# save attributes
-# 	for key in node.attrs:
-# 		value = node.attrs[key]
-# 		save_group_attribute(group_id, key, value)
-# 	return group_id
-
-def not_used_get_group_id(name):
-	global con, cur, file_id
-	path_id = get_path_id(name)
-	group_id = None  # return None if group with this name does not exist (don't add it)
-	cur.execute("select id from grp where file_id = ? and path_id = ?", (file_id, path_id,))
-	row = cur.fetchone()
-	if row is not None:
-		group_id = row[0]
-	return group_id
-
-# def find_parent_id(name):
-# 	global con, cur, file_id
-# 	path_id = get_path_id(name)
-# 	parent_id = None  # return None if node with this name does not exist (don't add it)
-# 	cur.execute("select id from node where file_id = ? and path_id = ?", (file_id, path_id,))
-# 	row = cur.fetchone()
-# 	if row is not None:
-# 		parent_id = row[0]
-# 	return parent_id
-
-
-# def save_group(name):
-# 	global con, cur, file_id
-# 	group_id = get_group_id(name)
-# 	if group_id:
-# 		# group already exists, no need to save it
-# 		return group_id
-# 	path_id = save_path(name)
-# 	cur.execute("select id from grp where file_id = ? and path_id = ?", (file_id, path_id,))
-# 	row = cur.fetchone()
-# 	if row is None:
-# 		parent_id = save_grp_name()
-# 		cur.execute("insert into grp (file_id, path_id) values (?, ?)", (file_id, path_id,))
-# 		con.commit()
-# 		grp_id = cur.lastrowid
-# 	else:
-# 		# group name is already in file
-# 		grp_id = row[0]
-# 	return grp_id
-
 def get_parent_id(name):
 	global con, cur, file_id
 	if name == "":
@@ -220,32 +108,6 @@ def get_parent_id(name):
 		else:
 			sys.exit("Unable to find parent for: '%s'" % name)
 	return parent_id
-
-def old_get_parent_id(name):
-	global con, cur, file_id
-	if name == "":
-		parent_id = 0  # root has no parent
-	else:
-		parent_name, name2 = os.path.split(name)
-		# assert name == name2, "name %s ~= %s, parent_name=%s, in get_parent_id for %s" % (name, name2, parent_name, full_name)
-		parent_id = get_group_id(parent_name)
-		assert parent_id is not None, "Unable to find parent for: '%s'" % name
-	return parent_id
-
-def old_save_group(name, node):
-	global con, cur, file_id
-	# full_name = node.name
-	parent_id = get_parent_id(name)
-	path_id = get_path_id(name)
-	cur.execute("insert into grp (file_id, path_id, parent_id) values (?, ?, ?)", 
-			(file_id, path_id, parent_id))
-	con.commit()
-	group_id = cur.lastrowid
-	# save attributes
-	for key in node.attrs:
-		value = node.attrs[key]
-		save_group_attribute(group_id, key, value)
-	return group_id
 
 def save_group(name, node):
 	global con, cur, file_id
@@ -262,25 +124,8 @@ def save_group(name, node):
 	for key in node.attrs:
 		value = node.attrs[key]
 		full_path = name + "/" + key
-		save_node_attribute(group_id, full_path, value)
+		save_attribute(group_id, full_path, value)
 	return group_id
-
-def old_save_dataset(name, node):
-	global con, cur, file_id
-	# full_name = node.name
-	group_id = get_parent_id(name)  # id of parent group
-	parent_name, ds_name = os.path.split(name)
-	name_id = get_path_id(ds_name)
-	value_id = get_value_id(node)
-	cur.execute("insert into dataset (file_id, group_id, name_id, value_id) values (?, ?, ?, ?)", 
-			(file_id, group_id, name_id, value_id))
-	con.commit()
-	dataset_id = cur.lastrowid
-	# save attributes
-	for key in node.attrs:
-		value = node.attrs[key]
-		save_dataset_attribute(dataset_id, key, value)
-	return dataset_id
 
 def save_dataset(name, node):
 	global con, cur, file_id
@@ -298,10 +143,10 @@ def save_dataset(name, node):
 	for key in node.attrs:
 		value = node.attrs[key]
 		full_path = name + "/" + key
-		save_node_attribute(dataset_id, full_path, value)
+		save_attribute(dataset_id, full_path, value)
 	return dataset_id
 
-def save_node_attribute(parent_id, attribute_path, value):
+def save_attribute(parent_id, attribute_path, value):
 	global con, cur, file_id
 	path_id = get_path_id(attribute_path)
 	value_id = get_value_id(value)
@@ -314,10 +159,8 @@ count = 0;
 def save_node(name, node):
 	global count
 	if isinstance(node,h5py.Group):
-		# old_save_group(name, node)
 		save_group(name, node)
 	elif isinstance(node,h5py.Dataset):
-		# old_save_dataset(name, node)
 		save_dataset(name, node)
 	else:
 		sys.exit("Unknown node type in save_node: %s" % node)
@@ -327,24 +170,7 @@ def save_node(name, node):
 	# 	return 1
 	return None
 
-def save_group_attribute(group_id, key, value):
-	global con, cur, file_id
-	name_id = get_path_id(key)
-	value_id = get_value_id(value)
-	cur.execute("insert into group_attribute (group_id, name_id, value_id) values (?, ?, ?)",
-		(group_id, name_id, value_id))
-	con.commit()
-
-def save_dataset_attribute(dataset_id, key, value):
-	global con, cur, file_id
-	name_id = get_path_id(key)
-	value_id = get_value_id(value)
-	cur.execute("insert into dataset_attribute (dataset_id, name_id, value_id) values (?, ?, ?)",
-		(dataset_id, name_id, value_id))
-	con.commit()
-
 # global variable for saving count of unknown types
-
 unknown_types = {}
 
 def clear_unknown_types():
@@ -566,13 +392,11 @@ def scan_file(path):
 	fp.close()
 	show_unknown_types()
 
-
 def scan_directory(dir):
 	for root, dirs, files in os.walk(dir):
 		for file in files:
 			if file.endswith("nwb"):
 				scan_file(os.path.join(root, file))
-
 def main():
 	global con
 	if len(sys.argv) < 2:
