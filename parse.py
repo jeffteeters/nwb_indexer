@@ -7,14 +7,14 @@ import shlex
 test_queries = """
 /general/subject/: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epochs : start_time < 150
 """
-scratch = """
+test_queries = """
 /ploc_a: cloc_a1 <= 789 & (cloc_a2 >= 200 | cloc_a3 <= 100) | ploc_b: cloc_b1 >= 20 & cloc_b2 LIKE "Name: Smith" & ploc_c: cloc_c1 >= "34 ( : )"
 /general/subject: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epoch : start_time < 150
 /general/subject: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04"
 /file_create_date LIKE "2017-04" & epochs: start_time>200 & stop_time<250
 epochs: start_time>200 & stop_time<250
 /file_create_date LIKE "2017-04"
-epochs:( (start_time>200 & stop_time<250) | (start_time > 1600 & stop_time < 1700))
+epochs:((start_time>200 & stop_time<250) | (start_time > 1600 & stop_time < 1700))
 epochs:(start_time>200 & stop_time<250) | epochs : (start_time > 1600 & stop_time < 1700)
 epochs: start_time>200 & stop_time<250 & /file_create_date LIKE "2017-04"
 epochs: start_time>200 & file_create_date LIKE "2017-04"
@@ -37,13 +37,15 @@ epochs: start_time>200 & file_create_date LIKE "2017-04"
 
 def parse(query):
 	print("parsing: '%s'" % query)
-	raw_tokens = list(shlex.shlex(query, punctuation_chars=True))
+	# raw_tokens = list(shlex.shlex(query, punctuation_chars=True))  # original, did not split "))"
+	raw_tokens = list(shlex.shlex(query, punctuation_chars="="))  # seems to work, splits "))", keeps "=="
+	# raw_tokens = list(shlex.shlex(query))  # fails, splits words on slash
 	# list of tuples, each tuple has index of parent locations (ploc) and 
 	# indexes of child locations for the parent locaton
 	plocs = []
 	# list with current ploc as fist element and index of clocs as subsequent elements
 	current_ploc = [""]
-	# processed tokens, ready to used in SQL statement
+	# processed tokens, ready to be used in SQL statement
 	tokens = []
 	ttypes = []  # token types; "ROP" - relational operator, "(", ")", "CLOC" - child location,
 		# "NC" -numeric constant, "SC" - string constant, "AOR" - and / or  
@@ -67,8 +69,8 @@ def parse(query):
 			ttypes.append("ROP")
 			tokens.append(token)
 			i += 1
-		elif token in ("(", ")"):
-			# found parentheses copy directly
+		elif token in ("(", ")", "[", "]"):
+			# found parentheses or brackets, copy directly
 			ttypes.append(token)
 			tokens.append(token)
 			i += 1
@@ -81,6 +83,11 @@ def parse(query):
 		elif token[0] in ("'", '"'):
 			# found string constant
 			ttypes.append("SC")
+			tokens.append(token)
+			i += 1
+		elif token[0] == ",":
+			# comma indicates cloc value to display, but not compute with
+			ttypes.append("COMMA")
 			tokens.append(token)
 			i += 1
 		elif re.match("^-?[0-9]*\.?[0-9]*$", token):
@@ -223,8 +230,8 @@ def main():
 	for query in queries:
 		if query:
 			ti = parse(query)
-			sql = make_sql(ti)
-			print ("sql=\n%s" % sql)
+			# sql = make_sql(ti)
+			# print ("sql=\n%s" % sql)
 
 if __name__ == "__main__":
 	main()
