@@ -2,7 +2,7 @@ import sys
 import os
 import h5py
 import numpy as np
-import parse
+import parse2
 import pprint
 import readline
 
@@ -208,7 +208,7 @@ def get_and_run_queries():
 		run_query(ti)
 	print("\nDone running all queries")
 
-def main():
+def main_old():
 	global sample_file, fp
 	if len(sys.argv) > 2:
 		sys.exit('Usage: %s [ <nwb_file> ]' % sys.argv[0])
@@ -226,6 +226,161 @@ def main():
 	# print ("scanning directory %s" % dir)
 	# scan_directory(dir)
 	con.close()
+
+def make_subquery_call_string(qi):
+	# build expression that calls runsubquery for each subquery
+	cs_tokens = []
+	cpi = 0  # current ploc index
+	i = 0
+	while i < len(qi['tokens']):
+		if cpi >= len(qi['plocs']) or i != qi['plocs'][cpi]["range"][0]:
+			# either past the last ploc, or not yet to the start of range of the current ploc
+			cs_tokens.append(qi["tokens"][i])
+			i += 1
+		else:
+			# this token is start of expression for subquery, replace by call
+			cs_tokens.append("runsubquery(%i,fp,qi,qr)" % cpi)
+			i = qi['plocs'][cpi]["range"][1]  # advance to end (skiping all tokens in subquery)
+			cpi += 1
+	return " ".join(cs_tokens)
+
+def get_search_criteria(cpi, qi):
+	# get sc (search_criteria) for finding hdf5 group or dataset to perform search
+	# sc = {
+	#  start_path - path to starting element to search.  This is specified by parent in query
+	#  match_path - regular expression for path that must match parent to do search.  Also
+	#               specified by parent in query.  May be different than start_path if 
+	#               wildcards are in parent.
+	#  search_all - True if searching all children of start_path.  False if searching just within
+	#               start_path
+	#  children   - list of children (attributes or datasets) that must be present to find a match
+	# }
+	ploc = qi["plocs"][cpi]["path"]
+	idx_first_star = ploc.find("*")
+	if idx_first_star > -1:
+		# at least one star (wild card)
+		start_path = ploc[0:idx_first_star]
+		if not start_path:
+			start_path = "/"
+		search_all = ploc[-1] == "*"   # search all if parent ends with wildcard
+		match_path = ploc.replace("*", "*.")  # replace * with *. for RE match later
+	else:
+		start_path = ploc
+		match_path = ploc
+		search_all = False
+	# make list of children
+	children = qi["plocs"][cpi]["display_clocs"].copy()
+	for i in qi["plocs"][cpi]["cloc_index"]:
+		children.append(qi["tokens"][i])
+	sc = {"start_path": start_path, "match_path": match_path,
+		"search_all": search_all, "children": children}
+	return sc
+
+
+def runsubquery(cpi, fp, qi, qr):
+	# run subquery with current ploc_index cpi, h5py pointer fp, and query information (qi)
+	# return results in qr
+
+	def search_node(name, node):
+		# search one node, may be group or dataset
+		# name is ignored
+		# cpi - current ploc index, fp - h5py file pointer
+		# qi - query information, qr - container for query results
+		# sc search criteria
+		# must always return None to allow search (visititems) to continue
+		nonlocal sc, cpi, fp, qi, qr
+		isGroup = isinstance(node,h5py.Group)
+		for child in sc["children"]:
+			found_child = child in node.attrs or (
+				isGroup and child in node and isinstance(node[child], h5py.Dataset))
+			if not found_child:
+				return None
+		# found all the children, return true and save location in query results (qr)
+		qr[cpi].append(node.name)
+		return None
+
+	sc = get_search_criteria(cpi, qi)
+	print("sc = %s" % sc)
+	if sc['start_path'] not in fp:
+		# did not even find starting path in hdf5 file, cannot do search
+		return False
+	start_node = fp[sc['start_path']]
+	search_node(None, start_node)
+	if sc['search_all'] and isinstance(start_node,h5py.Group):
+		start_node.visititems(search_node)
+	# qr[cpi] = "cpi=%i, ploc=%s, sc=%s" % (cpi, qi["plocs"][cpi]["path"], sc)
+	found = len(qr[cpi]) > 0  # will have content if result found
+	return found
+
+
+def display_result(path, qr):
+	print("file %s:" % path)
+	pp.pprint(qr)
+
+def query_file(path, qi):
+	fp = h5py.File(path, "r")
+	if not fp:
+		sys.exit("Unable to open %s" % path)
+	# for storing query results
+	qr = [[] for i in range(len(qi["plocs"]))]
+	subquery_call_string = make_subquery_call_string(qi)
+	print("%s" % subquery_call_string)
+	result = eval(subquery_call_string)
+	if result:
+	 	display_result(path, qr)
+
+def query_directory(dir, qi):
+	# must find files to query.  dir must be a directory
+	assert os.path.isdir(dir)
+	for root, dirs, files in os.walk(dir):
+		for file in files:
+			if file.endswith("nwb"):
+				path = os.path.join(root, file)
+				query_file(path, qi)
+
+def query_file_or_directory(path, qi):
+	# run a query on path, query specified in qi (query information, made in parse2.parse)
+	if os.path.isfile(path):
+		query_file(path, qi)
+	else:
+		query_directory(path, qi)
+
+def do_interactive_queries(path):
+	print("Enter query, control-d to quit")
+	while True:
+		try:
+			query=input("> ")
+		except EOFError:
+			break;
+		qi = parse2.parse(query)
+		query_file_or_directory(path, qi)
+	print("\nDone running all queries")
+
+def process_command_line(path, query):
+	# path is either a directory (search for NWB files) or a NWB file
+	# query is None (for interactive input), or a query to process
+	if query is None:
+		do_interactive_queries(path)
+	else:
+		qi = parse2.parse(query)
+		query_file_or_directory(path, qi)
+
+def main():
+	global sample_file
+	arglen = len(sys.argv)
+	if arglen < 2 or arglen > 3:
+		print("Usage: %s <path> [ <query> ]" % sys.argv[0])
+		print(" <path> = path to NWB file or directory or '-' for default path")
+		print(" <query> = query to execute (optional).  If present, must be quoted.")
+		sys.exit("")
+	path = sys.argv[1]
+	if path == "-":
+		path = sample_file
+		print("Using default path: '%s'" % path)
+	if not os.path.exists(path):
+		sys.exit("ERROR: path '%s' was not found!" % path)
+	query = sys.argv[2] if arglen == 3 else None
+	process_command_line(path, query)
 
 if __name__ == "__main__":
     main()
