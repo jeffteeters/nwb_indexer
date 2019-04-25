@@ -5,6 +5,7 @@ import numpy as np
 import parse2
 import pprint
 import readline
+import re
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -286,6 +287,19 @@ def get_search_criteria(cpi, qi):
 		"search_all": search_all, "children": children, "editoken": editoken}
 	return sc
 
+def make_like_pattern(sql_pattern):
+	# convert SQL like pattern (with "%" as wildcard) to regular expression pattern (with ".*" wildcard)
+	re_pattern = sql_pattern.replace("%", ".*")
+	# re_pattern = re_pattern.strip("\"'")
+	return re_pattern
+
+def like(pattern, text):
+	# implements LIKE operator.  pattern must be a regular expression, with "%" replaced by .*
+	if isinstance(text, bytes):
+		text = text.decode("utf-8")
+	match = re.fullmatch(pattern, text)
+	found_match = match is not None
+	return found_match
 
 def runsubquery(cpi, fp, qi, qr):
 	# run subquery with current ploc_index cpi, h5py pointer fp, and query information (qi)
@@ -345,7 +359,7 @@ def runsubquery(cpi, fp, qi, qr):
 		else:
  			ctype = None
 		return ctype
- 
+
 	def get_individual_values(node, ctypes, qre):
 		# fills qre["vind"], edits sc["editoken"]
 		# finds values of individual variables (not part of table) satisifying search criteria
@@ -353,6 +367,7 @@ def runsubquery(cpi, fp, qi, qr):
 		# result in True.  Edit sc["editoken"] replacing: var op const with True or False in
 		# perperation for eval done in get_row_values.
 		nonlocal sc, cpi, fp, qi
+
 		for i in range(len(sc["children"])):
 			ctype = ctypes[i]
 			if ctype == "DROW":
@@ -363,10 +378,10 @@ def runsubquery(cpi, fp, qi, qr):
 				value = node.attrs[child]
 			else:
 				value = node[child].value
-			assert len(value) > 0, "Empty value found: %s, %s" % (node.name, child) 
+			# assert len(value) > 0, "Empty value found: %s, %s" % (node.name, child) 
 			value = convert_to_list(value)
-			if child in qi["plocs"][cpi]["display_clocs"]:
-				# just displaying these values, not part of expression.  Save it
+			if i < len(qi["plocs"][cpi]["display_clocs"]): 
+				# just displaying these values, not part of expression.  Save it.  (display_clocs are first in children)
 				qre["vind"].append([child, ] + value)
 			else:
 				# child is part of expression.  Need to make string for eval to find values
@@ -375,7 +390,10 @@ def runsubquery(cpi, fp, qi, qr):
 				assert qi["ttypes"][tindx] == "CLOC", ("%s/%s, expected token CLOC, found token: %s value: %s"
 					" i=%i, tindx=%i, ttypes=%s, editoken=%s") % (node.name, child, qi["ttypes"][tindx],
 					sc["editoken"][tindx], i, tindx, qi["ttypes"], sc["editoken"])
-				str_filt = "filter( (lambda x: x %s %s), value)" % (qi["tokens"][tindx+1], qi["tokens"][tindx+2])
+				if qi["tokens"][tindx+1] == "LIKE":
+					str_filt = "filter( (lambda x: like(%s, x)), value)" % make_like_pattern(qi["tokens"][tindx+2])
+				else:
+					str_filt = "filter( (lambda x: x %s %s), value)" % (qi["tokens"][tindx+1], qi["tokens"][tindx+2])
 				matching_values = list(eval(str_filt))
 				found_match = len(matching_values) > 0
 				if found_match:
@@ -446,15 +464,22 @@ def runsubquery(cpi, fp, qi, qr):
 					assert qi["ttypes"][cloc_idx+1] in ("ROP", "LIKE"), (
 						"%s/%s expected relational operator but found token type: '%s', value: '%s'" % (node.name, 
 						child, qi["ttypes"][cloc_idx+1], sc["editoken"][cloc_idx+1]))
-					sc["editoken"][cloc_idx] =  "x[%i]" % val_idx # replace child name with x variable
+					if sc["editoken"][cloc_idx+1] == "LIKE":
+						# convert cloc LIKE str to call to like function
+						sc["editoken"][cloc_idx+1] = "like(%s, x[%i])" % (
+							make_like_pattern(sc["editoken"][cloc_idx+2]), val_idx)
+						sc["editoken"][cloc_idx] = ""
+						sc["editoken"][cloc_idx+2] = ""
+					else:
+						sc["editoken"][cloc_idx] =  "x[%i]" % val_idx # replace child name with x variable
 		# Done with loop creating expression to evaluate
 		# perform evaluation
 		# replace "&" and "|" and "LIKE" with and, or and "LIKE"
 		# tmap = {"&": "and", "|": "or", "LIKE": "=="}
 		# equery = [ tmap[x] if x in tmap else x for x in sc["editoken"]]
-		equery = [ "and" if x == "&" else "or" if x == "|" else "==" if x == "LIKE" else x for x in sc["editoken"]]
+		equery = [ "and" if x == "&" else "or" if x == "|" else x for x in sc["editoken"]]
 		equery = " ".join(equery)  # make it a single string
-		print("equery is: %s" % equery)
+		# print("equery is: %s" % equery)
 		if len(cvals) == 0:
 			# are no column values in this expression.  Just evaluate it
 			result = eval(equery)
@@ -472,7 +497,7 @@ def runsubquery(cpi, fp, qi, qr):
 
 	# start of main body of runsubqeury
 	sc = get_search_criteria(cpi, qi)
-	print("sc = %s" % sc)
+	# print("sc = %s" % sc)
 	if sc['start_path'] not in fp:
 		# did not even find starting path in hdf5 file, cannot do search
 		return False
@@ -496,7 +521,7 @@ def query_file(path, qi):
 	# for storing query results
 	qr = [[] for i in range(len(qi["plocs"]))]
 	subquery_call_string = make_subquery_call_string(qi)
-	print("%s" % subquery_call_string)
+	# print("%s" % subquery_call_string)
 	result = eval(subquery_call_string)
 	if result:
 	 	display_result(path, qr)
