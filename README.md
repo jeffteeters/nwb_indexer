@@ -236,8 +236,6 @@ file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
                                     '/processing/added_mod/ts_for_mod'],
                                 ['first', 'example'])]]}]]
 > /units: id, obs_intervals[0], obs_intervals[1], quality, location LIKE "CA1"
-child=obs_intervals[0], after indexed vals=[[], [], []]
-child=obs_intervals[1], after indexed vals=[[[1.0, 10.0]], [], []]
 file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
 [   [   {   'node': '/units',
             'vind': [],
@@ -246,11 +244,36 @@ file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
                                 'obs_intervals[1]',
                                 'quality',
                                 'location'],
-                            (1, [], [[1.0, 10.0]], 0.95, 'CA1'),
-                            (3, [], [], 0.9, 'CA1')]]}]]
+                            (1, [1.0], [10.0], 0.95, 'CA1'),
+                            (3, [1.0, 20.0], [10.0, 30.0], 0.9, 'CA1')]]}]]
+> /units: id, obs_intervals[0], obs_intervals[1], quality, neurodata_type LIKE "units" & location LIKE "CA1"
+> /units: id, obs_intervals[0], obs_intervals[1], quality, neurodata_type LIKE "Units" & location LIKE "CA1"
+file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
+[   [   {   'node': '/units',
+            'vind': [['neurodata_type', 'Units']],
+            'vrow': [   [   [   'id',
+                                'obs_intervals[0]',
+                                'obs_intervals[1]',
+                                'quality',
+                                'location'],
+                            (1, [1.0], [10.0], 0.95, 'CA1'),
+                            (3, [1.0, 20.0], [10.0, 30.0], 0.9, 'CA1')]]}]]
+> 
+$ python search_nwb2.py -
+Using default path: '../pynwb_examples/tutorials_python/general/basic_example.nwb'
+Enter query, control-d to quit
+> */epochs: id, neurodata_type, start_time > 2
+file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
+[   [   {   'node': '/intervals/epochs',
+            'vind': [['neurodata_type', 'TimeIntervals']],
+            'vrow': [[['id', 'start_time'], (1, 6.0)]]}]]
+> *: id, neurodata_type, start_time > 2
+file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
+[   [   {   'node': '/intervals/epochs',
+            'vind': [['neurodata_type', 'TimeIntervals']],
+            'vrow': [[['id', 'start_time'], (1, 6.0)]]},
+        {   'node': '/intervals/trials',
+            'vind': [['neurodata_type', 'TimeIntervals']],
+            'vrow': [[['id', 'start_time'], (1, 3.0), (2, 6.0)]]}]]
+>
 ```
-
-Last one above has a bug.  Need to fix.
-
-
-
