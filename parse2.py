@@ -22,8 +22,10 @@ grammar = Grammar(
     pair_compare = child ws relop ws ( number / string)
     parnexp = lparn expression rparn
     relop       = ("==" / "<=" / "<" / ">=" / ">" / "!=" / "LIKE")
-    child       = ~r"[\w]+"
-    disp_child  = ~r"[\w]+"
+    child       = child_name subscript?
+    disp_child  = child_name subscript?
+    child_name  = ~r"[\w]+"
+    subscript   = ~r"\[[\w]+\]"
     string      = ~r'"[^"]*"'
     number      = ~r"[0-9]+(\.[0-9]+)?"
     andor       = ("&" / "|")
@@ -32,6 +34,9 @@ grammar = Grammar(
     ws          = ~"\s*"
     """
 )
+    # old
+    # child       = ~r"[\w]+(\[[\w]+\])?"
+    # disp_child  = ~r"[\w]+(\[[\w]+\])?"
 
 def get_subqueries(qi):
     # return list of subqueries from query information (qi)
@@ -65,6 +70,10 @@ class IniVisitor(NodeVisitor):
         #    'path' - specified path of parent
         #    'cloc_index' - index (in tokens) of child locations specified in subquery
         #    'display_clocs' - list of child locations to display (comma seperated list after parent:)
+        #    'cloc_parts' - dictionary mapping full child location (with subscript) to tuple (main, sub)
+        #        (main location, subscript).  Examples: foo[1] => ('foo', '1'), bar[baz] => ('bar', 'baz')
+        #        This done for referencing components of compound datasets or columns in 2-d datasets (tables)
+        #        Tuples only present if subscript is in child location.
         #    'range' - tuple, (start, end) - index of tokens that are in subquery
 # Example, query:
 # (ploc1: p,q, r, (a >= 22 & b LIKE "sue") | (ploc2: t, m <= 14 & ploc3: x < 23))
@@ -85,10 +94,17 @@ class IniVisitor(NodeVisitor):
         self.ttypes.append("ROP")
         return visited_children or node
 
-    def visit_display_list(self, node, visited_children):
-        # display_list - list of disp_child locations to display
-        self.current_ploc['display_clocs'].append(visited_children[0].text)
-        return visited_children or node      
+    # def visit_display_list(self, node, visited_children):
+    #     # display_list - list of disp_child locations to display
+    #     self.current_ploc['display_clocs'].append(visited_children[0].text)
+    #     self.add_cloc_parts(visited_children[0].text)
+    #     return visited_children or node
+
+    def visit_disp_child(self, node, visited_children):
+        # disp_child - child location to display, may have subscript
+        self.current_ploc['display_clocs'].append(node.text)
+        self.add_cloc_parts(node, visited_children)
+        return visited_children or node
 
     def visit_string(self, node, visited_children):
         # string constant
@@ -136,6 +152,7 @@ class IniVisitor(NodeVisitor):
         self.current_ploc['cloc_index'].append(len(self.tokens))
         self.tokens.append(node.text)
         self.ttypes.append("CLOC")
+        self.add_cloc_parts(node, visited_children)
         return visited_children or node
 
     def visit_parent(self, node, visited_children):
@@ -143,7 +160,8 @@ class IniVisitor(NodeVisitor):
         self.location_map[node.start] = len(self.tokens)
         if self.current_ploc:
             self.plocs.append(self.current_ploc)
-        self.current_ploc = {'path': node.text, 'cloc_index': [], 'display_clocs': []}
+        self.current_ploc = {'path': node.text, 'cloc_index': [], 'display_clocs': [],
+            'cloc_parts': {}}
         # self.tokens.append(node.text)
         return visited_children or node
 
@@ -170,6 +188,14 @@ class IniVisitor(NodeVisitor):
         """ The generic visit method. """
         return visited_children or node
 
+    def add_cloc_parts(self, node, visited_children):
+        # check for subscript in child location.  If found, add to cloc_parts
+        if isinstance(visited_children[1], list):
+            main_name = visited_children[0].text
+            subscript = visited_children[1][0].text.strip("[]")
+            # found subscript
+            self.current_ploc['cloc_parts'][node.text] = (main_name, subscript)
+
 def parse(query):
     # parse a query, return qi - query info dictionary
     tree = grammar.parse(query)
@@ -181,6 +207,7 @@ def parse(query):
 def run_tests():
     test_queries = [
         # "p1:(a > 1 & p2: x>y)",  # fails
+        "units: p, r[0], interval[foo] > 14",
         "(ploc1: p,q, r, (a >= 22 & b LIKE \"sue\") | (ploc2: t, m <= 14 & ploc3: x < 23))",
         "(ploc1: (a > 22 & b LIKE \"sue\") | (ploc2: m < 14 & ploc3: x < 23 & y < 10))",
         "ploc: p, r, cloc > 23",

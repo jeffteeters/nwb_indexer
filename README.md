@@ -150,10 +150,107 @@ Found 2:
 2. ('../pynwb_examples/tutorials_python/domain/ophys_example.nwb', 'processing/my_ca_imaging_module/Fluorescence/my_rrs', 'processing/my_ca_imaging_module/Fluorescence/my_rrs/neurodata_type', 'RoiResponseSeries')
 ```
 
+# search_nwb2.py
+
+#### Example queries (NWB 1.0x files):
+
+```
+> /general/subject:age LIKE "3 months 16 days%" & /epochs/*: start_time < 250
+file ../sample_data/data_structure_ANM210862_20130627.nwb:
+[   [   {   'node': '/general/subject',
+            'vind': [['age', b'3 months 16 days  weeks']],
+            'vrow': []}],
+    [   {   'node': '/epochs/trial_001',
+            'vind': [['start_time', 2.284463]],
+            'vrow': []}]]
+file ../sample_data/data_structure_ANM210863_20130627.nwb:
+[   [   {   'node': '/general/subject',
+            'vind': [['age', b'3 months 16 days  weeks']],
+            'vrow': []}],
+    [   {   'node': '/epochs/trial_001',
+            'vind': [['start_time', 2.222392]],
+            'vrow': []},
+        {   'node': '/epochs/trial_002',
+            'vind': [['start_time', 225.421499]],
+            'vrow': []},
+        {   'node': '/epochs/trial_003',
+            'vind': [['start_time', 234.211464]],
+            'vrow': []},
+        {   'node': '/epochs/trial_004',
+            'vind': [['start_time', 243.062595]],
+            'vrow': []}]]
+> /general/subject/: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs : start_time < 150
+> /general/subject/: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 150
+file ../sample_data/data_structure_ANM210862_20130627.nwb:
+[   [   {   'node': '/general/subject',
+            'vind': [   ['age', b'3 months 16 days  weeks'],
+                        ['species', b'Mus musculus']],
+            'vrow': []}],
+    [   {   'node': '/',
+            'vind': [['file_create_date', b'2017-04-24T11:32:54.215883']],
+            'vrow': []}],
+    [   {   'node': '/epochs/trial_001',
+            'vind': [['start_time', 2.284463]],
+            'vrow': []}]]
+file ../sample_data/data_structure_ANM210863_20130627.nwb:
+[   [   {   'node': '/general/subject',
+            'vind': [   ['age', b'3 months 16 days  weeks'],
+                        ['species', b'Mus musculus']],
+            'vrow': []}],
+    [   {   'node': '/',
+            'vind': [['file_create_date', b'2017-04-24T11:32:54.076284']],
+            'vrow': []}],
+    [   {   'node': '/epochs/trial_001',
+            'vind': [['start_time', 2.222392]],
+            'vrow': []}]]
+```
 
 
+#### Example queries (NWB 2.x files):
 
 
+```
+Jeffs-MacBook:nwbindexer jt$ python search_nwb2.py -
+Using default path: '../pynwb_examples/tutorials_python/general/basic_example.nwb'
+Enter query, control-d to quit
+> units: id, location, quality > 0.93
+file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
+[   [   {   'node': '/units',
+            'vind': [],
+            'vrow': [[['id', 'location', 'quality'], (1, 'CA1', 0.95)]]}]]
+> intervals/epochs: id, start_time, stop_time, timeseries[timeseries], tags LIKE "fir%"
+child=timeseries[timeseries], after indexed vals=[['/acquisition/test_timeseries', '/processing/added_mod/ts_for_mod'], ['/acquisition/test_timeseries', '/processing/added_mod/ts_for_mod']]
+child=tags, after indexed vals=[['first', 'example'], ['second', 'example']]
+file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
+[   [   {   'node': '/intervals/epochs',
+            'vind': [],
+            'vrow': [   [   [   'id',
+                                'start_time',
+                                'stop_time',
+                                'timeseries[timeseries]',
+                                'tags'],
+                            (   0,
+                                2.0,
+                                4.0,
+                                [   '/acquisition/test_timeseries',
+                                    '/processing/added_mod/ts_for_mod'],
+                                ['first', 'example'])]]}]]
+> /units: id, obs_intervals[0], obs_intervals[1], quality, location LIKE "CA1"
+child=obs_intervals[0], after indexed vals=[[], [], []]
+child=obs_intervals[1], after indexed vals=[[[1.0, 10.0]], [], []]
+file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
+[   [   {   'node': '/units',
+            'vind': [],
+            'vrow': [   [   [   'id',
+                                'obs_intervals[0]',
+                                'obs_intervals[1]',
+                                'quality',
+                                'location'],
+                            (1, [], [[1.0, 10.0]], 0.95, 'CA1'),
+                            (3, [], [], 0.9, 'CA1')]]}]]
+```
+
+Last one above has a bug.  Need to fix.
 
 
 
