@@ -47,20 +47,13 @@ def get_subqueries(qi):
 
 
 class IniVisitor(NodeVisitor):
-    tokens = []
-    token_types = []
-    plocs = []
-    current_ploc = None
-    location_map = {}   # map original location (character position in query) to index in tokens
-    # Will have: {'cloc_index': [], 'display_clocs': []}
-    # will have {'path': '/x/y/z', cloc_index: [1, 4, 5], display_clocs: ['name1', 'name2', ... ]}
 
     def __init__(self):
         self.tokens = []
         self.ttypes = []  # token types
         self.plocs = []
         self.current_ploc = None
-        self.location_map = {}
+        self.location_map = {} # map original location (character position in query) to index in tokens
 
     def get_query_info(self):
         # return query information
@@ -76,13 +69,20 @@ class IniVisitor(NodeVisitor):
         #        Tuples only present if subscript is in child location.
         #    'range' - tuple, (start, end) - index of tokens that are in subquery
 # Example, query:
-# (ploc1: p,q, r, (a >= 22 & b LIKE "sue") | (ploc2: t, m <= 14 & ploc3: x < 23))
-# qi= {
-#    'plocs': [   {'cloc_index': [2, 6], 'display_clocs': ['p', 'q', 'r'], 'path': 'ploc1', 'range': (1, 10)},
-#                  {'cloc_index': [12], 'display_clocs': ['t'], 'path': 'ploc2', 'range': (12, 15)},
-#                  {'cloc_index': [16], 'display_clocs': [], 'path': 'ploc3', 'range': (16, 19)}],
-#     'tokens': [   '(', '(', 'a', '>=', '22', '&', 'b', 'LIKE', '"sue"', ')', '|', '(', 'm', '<=', '14', '&', 'x', '<',
-#                   '23', ')', ')'],
+# (ploc1: p,q, r, (a[bar] >= 22 & b LIKE "sue") | (ploc2: t[0], m <= 14 & ploc3: x < 23))
+# {   'plocs': [   {   'cloc_index': [2, 6],
+#                      'cloc_parts': {'a[bar]': ('a', 'bar')},
+#                      'display_clocs': ['p', 'q', 'r'],
+#                      'path': 'ploc1',
+#                      'range': (1, 10)},
+#                  {   'cloc_index': [12],
+#                      'cloc_parts': {'t[0]': ('t', '0')},
+#                      'display_clocs': ['t[0]'],
+#                      'path': 'ploc2',
+#                      'range': (12, 15)},
+#                  {'cloc_index': [16], 'cloc_parts': {}, 'display_clocs': [], 'path': 'ploc3', 'range': (16, 19)}],
+#     'tokens': [   '(', '(', 'a[bar]', '>=', '22', '&', 'b', 'LIKE', '"sue"', ')', '|', '(', 'm', '<=', '14', '&', 'x',
+#                   '<', '23', ')', ')'],
 #     'ttypes': [   '(', '(', 'CLOC', 'ROP', 'NC', 'AOR', 'CLOC', 'ROP', 'SC', ')', 'AOR', '(', 'CLOC', 'ROP', 'NC',
 #                   'AOR', 'CLOC', 'ROP', 'NC', ')', ')']}
         qi = {"tokens": self.tokens, "ttypes": self.ttypes, "plocs": self.plocs, }
@@ -211,6 +211,7 @@ def run_tests():
         "(ploc1: p,q, r, (a >= 22 & b LIKE \"sue\") | (ploc2: t, m <= 14 & ploc3: x < 23))",
         "(ploc1: (a > 22 & b LIKE \"sue\") | (ploc2: m < 14 & ploc3: x < 23 & y < 10))",
         "ploc: p, r, cloc > 23",
+        "(ploc1: p,q, r, (a[bar] >= 22 & b LIKE \"sue\") | (ploc2: t[0], m <= 14 & ploc3: x < 23))",
         # "ploc: cloc1,",
         # "ploc: cloc LIKE \"Sue Smith\"",
         # "ploc1: cloc > 23 & ploc2: cloc2, cloc3 > 25",
