@@ -7,6 +7,13 @@ import pprint
 import readline
 import re
 
+# Tool or searching NWB files, both version 1 and 2.
+#
+# If reading this code to figure out how it works
+# READ FROM THE BOTTOM TO THE TOP, starting with function main.
+# The code uses the parser in file parse2.py
+
+
 pp = pprint.PrettyPrinter(indent=4)
 
 sample_file = "../pynwb_examples/tutorials_python/general/basic_example.nwb"

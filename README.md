@@ -277,3 +277,59 @@ file ../pynwb_examples/tutorials_python/general/basic_example.nwb:
             'vrow': [[['id', 'start_time'], (1, 3.0), (2, 6.0)]]}]]
 >
 ```
+Searching in another NWB 2.0 file:
+
+```
+$ python search_nwb2.py ../pynwb_examples/ecephys_example.nwb
+Enter query, control-d to quit
+> /general/extracellular_ephys/*: id, location, x, y, z, group, group_name, filtering, imp < 0
+file ../pynwb_examples/ecephys_example.nwb:
+[   [   {   'node': '/general/extracellular_ephys/electrodes',
+            'vind': [],
+            'vrow': [   [   [   'id',
+                                'location',
+                                'x',
+                                'y',
+                                'z',
+                                'group',
+                                'group_name',
+                                'filtering',
+                                'imp'],
+                            (   0,
+                                'CA1',
+                                1.0,
+                                2.0,
+                                3.0,
+                                '/general/extracellular_ephys/tetrode1',
+                                'tetrode1',
+                                'none',
+                                -1.0),
+                            (   1,
+                                'CA1',
+                                1.0,
+                                2.0,
+                                3.0,
+                                '/general/extracellular_ephys/tetrode1',
+                                'tetrode1',
+                                'none',
+                                -2.0),
+                            (   2,
+                                'CA1',
+                                1.0,
+                                2.0,
+                                3.0,
+                                '/general/extracellular_ephys/tetrode1',
+                                'tetrode1',
+                                'none',
+                                -3.0),
+                            (   3,
+                                'CA1',
+                                1.0,
+                                2.0,
+                                3.0,
+                                '/general/extracellular_ephys/tetrode1',
+                                'tetrode1',
+                                'none',
+                                -4.0)]]}]]
+> 
+```
