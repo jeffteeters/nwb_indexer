@@ -5,7 +5,7 @@ import sqlite3
 import numpy as np
 import math
 
-dbname="nwb_index.db"
+dbname="nwb_idx2.db"
 con = None     # database connection
 file_id = None # id of current file (row inf h5file table)
 cur = None       # cursor
@@ -13,41 +13,156 @@ cur = None       # cursor
 
 # sqlite3 database schema
 schema='''
-create table path (				-- All paths / names
-	id integer primary key,
-	name text not null
+create table prenom (		-- all names (file names and path parts; 'prenom' is french for given name)
+	id integer primary key, -- (The main reason this table is not named "name" is there is another table
+	name text not null 		-- "node" which starts with "n".  For aliases it's nice to have table names
+							-- start with different letters).
 );
+-- create index name_idx on prenom(name);  -- not sure if this helps
 
 create table file (				-- hdf5 files
 	id integer primary key,
-	path_id integer not null
+	prenom_id integer not null references prenom  -- prenom contains full path to file 
 );
 
 create table node (  -- stores groups, dataseta AND attributes
 	id integer primary key,
-	file_id integer not null,
-	parent_id integer not null, -- parent group (if group or dataset) or parent group or dataset (if attribute)
-	path_id integer not null,	-- path to this node (group, dataset or attribute)
+	file_id integer not null references file,
+	parent_id integer references node, -- parent group (if group or dataset) or parent group or dataset (if attribute)
+	prenom_id integer not null references prenom, -- name of this node (last component of full path)
 	node_type char(1) not null,	-- either: g-group, d-dataset, a-attribute
-	value_id integer not null	-- value associated with dataset or attribute
+	value_id integer references value	-- value associated with dataset or attribute.
+		-- NULL if group or if value is not saved (dataset or attribute with multiple dimensions)
 );
 
 create table value (			-- value of dataset or attribute
 	id integer primary key,
-	type char(1) not null,  -- either: n-number, s-string, N-number array, S-string array
-	nval real not null,     -- contains value of number, if number
-	str_id integer not null -- index to string id if string, or string array; otherwise 0
+	type char(1) not null,		-- either: n-number, s-string, N-number array, S-string array
+	nval real,					-- contains value of number, if type 'n'.  Otherwise, NULL
+	sval text					-- stores values of type s, N, S as comma seperated values otherwise NULL
 );
 
-create table string (
-	id integer primary key,
-	value text
-);
+create index nval_idx on value(nval) where nval is not NULL;  -- Help speedup searches for scalars
+create index sval_idx on value(sval) where type = 's';
 ''';
+
+# create table value (			-- value of dataset or attribute
+# 	id integer primary key,
+# 	type char(1) not null,		-- either: n-number, s-string, N-number array, S-string array
+# 								-- u - unknown (value not stored, might be too large)
+# 	nval real,					-- contains value of number, if type 'n'.  Otherwise, NULL
+# 	string_id integer			-- index of value in array string (if stored there), otherwise NULL
+# );
+
+# create table string (			-- stores all values (type s, N, S) as comma seperated values
+# 	id integer primary key,
+# 	value text not null
+# );
+
+
+# class Path_id:
+# 	path_map = {}
+
+
+# FOLLOWING NOT USED BECAUSE: table string not used anymore.  Table prenom stored directly without map
+# because prenom names must be referenced by entries in node table
+# class Vmap:
+# 	# maps value to id
+# 	# used for prenom and string table
+# 	def __init__(self, table_name, value_name):
+# 		# maps values to id
+# 		self.map = {}
+# 		self.table_name = table_name
+# 		self.value_name = value_name
+# 		self.load_map()
+
+# 	def get_id(self, value):
+# 		# get id corresponding to value (which must be a string). Will add value to map if not present
+# 		assert isinstance(value, str)
+# 		if v in self.map:
+# 			key = self.map[v][0]  # key is the id
+# 		else:
+# 			key = len(self.map) + 1
+# 			self.vmap[value] = (key, 'new')  # save indicator if record is new
+
+# 	def load_map(self):
+# 		# load values from table.  Needed if updating database
+# 		global con, cur
+# 		assert len(self.map) == 0, "load_map for table '%s' called, but map not empty" % self.table_name
+# 		result = cur.execute("select id, %s from %s order by %s" % (self.value_name, self.table_name, self.value_name))
+# 		for row in result:
+# 			key, value = row
+# 			self.map[value] = (key, 'old')  # save indicator that record is already in database
+
+# 	def save_map(self, table_name, value_name):
+# 		# saves map in the database
+# 		global con, cur
+# 		# execute insert statements
+# 		for key, vt in sorted(self.map.items(), key = lambda kv:(kv[1], kv[0])):
+# 			if vt[1] == 'new':  # only save new records
+# 				cur.execute("insert into %s (id, %s) values (?, ?)" % (self.table_name, self.value_name), (key, vt[0]))
+
+
+class Value_mirror:
+	# used for quick lookups of values in value table when building index
+	def __init__(self):
+		# maps values to id
+		self.mirror = []  # mirror of value table, elements are: (id, type, nval, sval)
+		self.nval2id = {} # maps numeric values to id (id column in value table)
+		self.sval2id = {} # maps string values to id
+		self.load_mirror()
+
+	def load_mirror(self):
+		# load values from table.  Needed if updating database
+		global con, cur
+		assert len(self.mirror) == 0, "load_mirror for table 'value' called, but mirror not empty"
+		result = cur.execute("select id, type, nval, sval from value order by id")
+		for row in result:
+			vid, vtype, nval, sval = row
+			self.mirror.append( (vid, vtype, nval, sval) )
+			assert vid == len(self.mirror), "column id in table value expected to be sequential, but is not"
+			if vtype == 'n':
+				self.nval2id[nval] = id
+			elif sval is not None:
+				self.sval2id[sval] = id
+		self.original_length = len(self.mirror)  # save original length of table (so will know what is new)
+
+	def get_id(self, vtype, nval, sval):
+		assert vtype in ('n', 'N', 's', 'S'), 'value vtype invalid: "%s"' % vtype
+		if vtype == 'n':
+			assert (isinstance(nval, int) or isinstance(nval, float)) and sval is None, (
+				"value type 'n' not consistent")
+			if nval in self.nval2id:
+				vid = self.nval2id[nval]
+			else:
+				vid = len(self.mirror) + 1
+				self.mirror.append ( (vid, vtype, nval, sval) )
+				self.nval2id[nval] = vid
+		else:
+			assert isinstance(sval, str) and nval is None, "value type 's' not consisitent"
+			if sval in self.sval2id:
+				vid = self.sval2id[sval]
+			else:
+				vid = len(self.mirror) + 1
+				self.mirror.append ( (vid, vtype, nval, sval) )
+				self.sval2id[sval] = vid
+		return vid
+
+	def save_mirror(self):
+		# saves value table mirror in the database
+		global con, cur
+		# execute insert statements
+		for i in range(self.original_length, len(self.mirror)):
+			# only save new entries (specified by original_length)
+			cur.execute("insert into value (id, type, nval, sval) values (?, ?, ?, ?)" % self.mirror[i])
 
 def open_database():
 	global dbname, schema
 	global con, cur
+	# for testing
+	if os.path.isfile(dbname):
+		print("removing previous database %s" % dbname)
+		os.remove(dbname)
 	if not os.path.isfile(dbname):
 		print("Creating database '%s'" % dbname)
 		con = sqlite3.connect(dbname)
@@ -58,24 +173,51 @@ def open_database():
 		con = sqlite3.connect(dbname)
 		cur = con.cursor()
 
-def get_path_id(name):
+# def initialize_maps():
+# 	global value_mirror
+# 	# prenom_map = Vmap("prenom", "name")
+# 	# string_map = Vmap("string", "value")
+# 	value_mirror = Value_mirror()
+
+
+# def get_path_id(name):
+# 	global con, cur
+# 	cur.execute("select id from path where name=?", (name,))
+# 	row = cur.fetchone()
+# 	if row is None:
+# 		cur.execute("insert into path (name) values (?)", (name,))
+# 		con.commit()
+# 		path_id = cur.lastrowid
+# 	else:
+# 		# name was already stored
+# 		path_id = row[0]
+# 	return path_id
+
+def get_prenom_id(name):
 	global con, cur
-	cur.execute("select id from path where name=?", (name,))
+	cur.execute("select id from prenom where name=?", (name,))
 	row = cur.fetchone()
 	if row is None:
-		cur.execute("insert into path (name) values (?)", (name,))
+		cur.execute("insert into prenom (name) values (?)", (name,))
 		con.commit()
-		path_id = cur.lastrowid
+		prenom_id = cur.lastrowid
 	else:
 		# name was already stored
-		path_id = row[0]
-	return path_id
+		prenom_id = row[0]
+	return prenom_id
+
+# def get_prenom_id(name):
+# 	global prenom_map
+# 	return prenom_map.get_id(name)
+
 
 def find_file_id(name):
 	# return file_id if have file in database, otherwise None
 	global con, cur
-	path_id = get_path_id(name)
-	cur.execute("select id from file where path_id = ?", (path_id,))
+	# path_id = get_path_id(name)
+	# cur.execute("select id from file where path_id = ?", (path_id,))
+	prenom_id = get_prenom_id(name)
+	cur.execute("select id from file where prenom_id = ?", (prenom_id,))
 	row = cur.fetchone()
 	if row is None:
 		file_id = None
@@ -87,8 +229,10 @@ def get_file_id(name):
 	global con, cur
 	file_id = find_file_id(name)
 	if file_id is None:
-		path_id = get_path_id(name)
-		cur.execute("insert into file (path_id) values (?)", (path_id,))
+		# path_id = get_path_id(name)
+		# cur.execute("insert into file (path_id) values (?)", (path_id,))
+		prenom_id = get_prenom_id(name)
+		cur.execute("insert into file (prenom_id) values (?)", (prenom_id,))
 		con.commit()
 		file_id = cur.lastrowid
 	print("file_id is %i" % file_id)
@@ -97,62 +241,88 @@ def get_file_id(name):
 def get_parent_id(name):
 	global con, cur, file_id
 	if name == "":
-		parent_id = 0  # root has no parent
+		parent_id = None  # root has no parent
 	else:
-		parent_name, name2 = os.path.split(name)
-		path_id = get_path_id(parent_name)
-		cur.execute("select id from node where file_id = ? and path_id = ?", (file_id, path_id,))
-		row = cur.fetchone()
-		if row is not None:
-			parent_id = row[0]
-		else:
-			sys.exit("Unable to find parent for: '%s'" % name)
+		# Must generate sql query to get parent id.  parent is the node with path
+		# equal to the path parts, except for the last component
+		path_parts = name.split('/')[0:-1]
+		parent_depth = len(path_parts)  # depth of parent, 0 depth is root
+		select_start = "select n%i.id " % parent_depth
+		from_clause = ["\nfrom node n0"]
+		where_clause = ["\nwhere n0.parent_id is NULL", "n0.file_id = %i" % file_id]
+		depth = 0
+		for path in path_parts:
+			depth += 1
+			from_clause.append( "node n%i, prenom p%i" % (depth, depth))
+			where_clause.append( "n%i.parent_id = n%i.id and n%i.prenom_id = p%i.id and p%i.name = ?" %
+				(depth, depth-1, depth, depth, depth ))
+		sql = select_start + ", ".join(from_clause) + " and ".join(where_clause)
+		result = cur.execute(sql, path_parts)
+		rows=result.fetchall()
+		assert len(rows) == 1, "expected to find 1 node for parent of: %s, but found %i, sql=\n%s,\npath_parts=%s" % (
+			name, len(rows), sql, path_parts)
+		parent_id = rows[0][0]
 	return parent_id
+
+
+# def get_parent_id_old(name):
+# 	global con, cur, file_id
+# 	if name == "":
+# 		parent_id = None  # root has no parent
+# 	else:
+# 		parent_name, name2 = os.path.split(name)
+# 		path_id = get_path_id(parent_name)
+# 		cur.execute("select id from node where file_id = ? and path_id = ?", (file_id, path_id,))
+# 		row = cur.fetchone()
+# 		if row is not None:
+# 			parent_id = row[0]
+# 		else:
+# 			sys.exit("Unable to find parent for: '%s'" % name)
+# 	return parent_id
 
 def save_group(name, node):
 	global con, cur, file_id
 	# full_name = node.name
 	parent_id = get_parent_id(name)
-	path_id = get_path_id(name)
+	base_name = name.split('/')[-1]
+	prenom_id = get_prenom_id(base_name)
 	node_type = "g"		# indicates group
-	value_id = 0
-	cur.execute("insert into node (file_id, parent_id, path_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
-			(file_id, parent_id, path_id, node_type, value_id))
+	value_id = None
+	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
+			(file_id, parent_id, prenom_id, node_type, value_id))
 	con.commit()
 	group_id = cur.lastrowid
 	# save attributes
 	for key in node.attrs:
 		value = node.attrs[key]
-		full_path = name + "/" + key
-		save_attribute(group_id, full_path, value)
+		save_attribute(group_id, key, value)
 	return group_id
 
 def save_dataset(name, node):
 	global con, cur, file_id
 	# full_name = node.name
 	parent_id = get_parent_id(name)  # id of parent group
-	# parent_name, ds_name = os.path.split(name)
-	path_id = get_path_id(name)
+	base_name = name.split('/')[-1]
+	prenom_id = get_prenom_id(base_name)
 	value_id = get_value_id(node)
 	node_type = "d"  # dataset
-	cur.execute("insert into node (file_id, parent_id, path_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
-			(file_id, parent_id, path_id, node_type, value_id))
+	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
+			(file_id, parent_id, prenom_id, node_type, value_id))
 	con.commit()
 	dataset_id = cur.lastrowid
 	# save attributes
 	for key in node.attrs:
 		value = node.attrs[key]
-		full_path = name + "/" + key
-		save_attribute(dataset_id, full_path, value)
+		save_attribute(dataset_id, key, value)
 	return dataset_id
 
-def save_attribute(parent_id, attribute_path, value):
+def save_attribute(parent_id, key, value):
 	global con, cur, file_id
-	path_id = get_path_id(attribute_path)
+	prenom_id = get_prenom_id(key)
 	value_id = get_value_id(value)
 	node_type = "a"		# indicates attribute
-	cur.execute("insert into node (file_id, parent_id, path_id, node_type, value_id) values (?, ?, ?, ?, ?)",
-		(file_id, parent_id, path_id, node_type, value_id))
+	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)",
+		(file_id, parent_id, prenom_id, node_type, value_id))
 	con.commit()
 
 count = 0;
@@ -194,6 +364,7 @@ def show_unknown_types():
 
 def get_value_id(node):
 	global con, cur, file_id
+	return None   # dummy value_id, for testing
 	nval = 0		# default values for number and string index
 	str_id = 0
 	if isinstance(node,h5py.Dataset):
@@ -398,13 +569,15 @@ def scan_directory(dir):
 			if file.endswith("nwb"):
 				scan_file(os.path.join(root, file))
 def main():
-	global con
+	global con, value_mirror
 	if len(sys.argv) < 2:
 		sys.exit('Usage: %s <directory_name>' % sys.argv[0])
 	if not os.path.isdir(sys.argv[1]):
 		sys.exit('ERROR: directory %s was not found!' % sys.argv[1])
 	dir = sys.argv[1]
 	open_database()
+	value_mirror = Value_mirror()
+	# initialize_maps()
 	print ("scanning directory %s" % dir)
 	scan_directory(dir)
 	con.close()
