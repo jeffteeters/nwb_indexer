@@ -138,7 +138,6 @@ class Value_mirror:
 # should be saved, for NWB 2.x tables with aligned columns or compound tables.
 groups_with_colnames_attribute = []
 
-
 def open_database():
 	global dbname, schema
 	global con, cur
@@ -184,20 +183,17 @@ def get_file_id(name):
 	if file_id is None:
 		prenom_id = get_prenom_id(name)
 		cur.execute("insert into file (prenom_id) values (?)", (prenom_id,))
-#		con.commit()
 		file_id = cur.lastrowid
 	return file_id
 
 def save_group(node, parent_id):
 	global con, cur, file_id, groups_with_colnames_attribute
-	# full_name = node.name
 	base_name = node.name.split('/')[-1]
 	prenom_id = get_prenom_id(base_name)
 	node_type = "g"		# indicates group
 	value_id = None
 	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
 			(file_id, parent_id, prenom_id, node_type, value_id))
-#	con.commit()
 	group_id = cur.lastrowid
 	# save attributes
 	for key in node.attrs:
@@ -209,7 +205,6 @@ def save_group(node, parent_id):
 
 def save_dataset(node, parent_id):
 	global con, cur, file_id
-	# full_name = node.name
 	base_name = node.name.split('/')[-1]
 	prenom_id = get_prenom_id(base_name)
 	value_id = get_value_id_from_dataset(node, parent_id)
@@ -244,7 +239,6 @@ def get_value_id_from_attribute(value, attribute_path):
 	global fp, value_mirror
 	if isinstance(value, np.ndarray):
 		if len(value.shape) > 1:
-			# for dataset, would need to check for 2-d table
 			return None
 		if len(value) == 0:
 			return None	# don't save zero length values
@@ -342,7 +336,6 @@ def get_value_id_from_dataset(node, parent_id):
 			# also, don't store if too big, e.g. image mask table
 			# or if is more then 2 dimensions or if more than 10 columns (arbituary cutoff)
 			return None
-		# print("found dataset with shape > 1, inside table group: %s" % node.name)
 		colnames = ','.join([ "%i" % i for i in range(node.shape[1]) ])
 		coldata = ';'.join(format_column(node[:,i], node) for i in range(node.shape[1]))
 		sval = colnames + '%' + coldata
@@ -480,7 +473,6 @@ def visit_nodes(fp):
 					# unable to access this node.  Perhaps a broken external link.  Ignore
 					continue
 				to_visit.append( (cn, node_id))
-				# to_visit.append( (node[child], node_id))
 
 def scan_file(path):
 	global file_id, con, fp
