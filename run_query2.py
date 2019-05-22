@@ -23,14 +23,14 @@ def open_database():
 
 def show_available_files():
 	global con, cur
-	result=cur.execute("select p.name from prenom p, file f where f.prenom_id = p.id order by p.name")
+	result=cur.execute("select id, location from file order by id")
 	rows=result.fetchall()
 	num_rows = len(rows)
 	print("Searching %i files:" % num_rows)
 	n = 0
 	for row in rows:
 		n += 1
-		print("%i. %s" % (n, row))
+		print("%i. %s" % (row))
 
 def run_query(sql):
 	global con, cur

@@ -13,26 +13,31 @@ cur = None       # cursor
 
 # sqlite3 database schema
 schema='''
-create table prenom (		-- all names (file names and path parts; 'prenom' is french for given name)
-	id integer primary key, -- (The main reason this table is not named "name" is there is another table
-	name text not null 		-- "node" which starts with "n".  For aliases it's nice to have table names
-							-- start with different letters).
+create table name (			-- name (last component of path) of hdf5 entities.  Used to locate child nodes of parent
+	id integer primary key,
+	name text not null
 );
--- create index name_idx on prenom(name);  -- not sure if this helps
+-- create index name_idx on name(name);  -- not sure if this helps
+
+create table path (  -- paths listed explicitly.  Used to search for 'parent' entities specified in query.
+  id integer primary key,
+  path text not null  -- full path, without leading '/'
+);
 
 create table file (				-- hdf5 files
 	id integer primary key,
-	prenom_id integer not null references prenom  -- prenom contains full path to file 
+	location text	-- contains full path to file 
 );
 
 create table node (  -- stores groups, dataseta AND attributes
 	id integer primary key,
 	file_id integer not null references file,
 	parent_id integer references node, -- parent group (if group or dataset) or parent group or dataset (if attribute)
-	prenom_id integer not null references prenom, -- name of this node (last component of full path)
+	name_id integer references name, -- name of this node (last component of full path)
+	path_id integer references path, -- full path to this node.  Only saved if this node has any children.
 	node_type char(1) not null,	-- either: g-group, d-dataset, a-attribute
 	value_id integer references value	-- value associated with dataset or attribute.
-		-- NULL if group or if value is not saved (dataset or attribute with multiple dimensions)
+		-- NULL if group or if value is not saved (e.g., numeric arrays not part of a table)
 );
 
 create table value (			-- value of dataset or attribute
@@ -50,34 +55,75 @@ create index nval_idx on value(nval) where nval is not NULL;  -- Help speedup se
 create index sval_idx on value(sval) where type = 's';
 ''';
 
-class Prenom_cache:
-	# cache values for prenom to allow quick lookup of prenom_id
-	# used for prenom and string table
-	def __init__(self):
-		# maps values to id
-		self.cache = {}
-		self.load_cache()
 
-	def get_id(self, pname):
-		global cur
-		# get id corresponding to value (which must be a string). Will add value to map if not present
-		assert isinstance(pname, str)
-		if pname in self.cache:
-			pid = self.cache[pname]  # prenom id, 'p' stands for prenome
-		else:
-			pid = len(self.cache) + 1
-			self.cache[pname] = pid  # save indicator if record is new
-			cur.execute("insert into prenom (id, name) values (?, ?)", (pid, pname))
-		return pid
+class Cache:
+  # cache map of value to id
+  # used to speedup creation of name and path table
+  def __init__(self, table_name, value_name):
+    # maps values to id
+    self.map = {}
+    self.table_name = table_name
+    self.value_name = value_name
+    self.load_map()
 
-	def load_cache(self):
-		# load prenom values from table.  Needed if updating database
-		global cur
-		assert len(self.cache) == 0, "Prenom_cache load_cache called, but cache not empty"
-		result = cur.execute("select id, name from prenom order by id")
-		for row in result:
-			pid, pname = row
-			self.cache[pname] = pid
+  def get_id(self, value):
+    # get id corresponding to value (which must be a string). Will add value to map if not present
+    assert isinstance(value, str)
+    if value in self.map:
+      key = self.map[value]  # key is the id
+    else:
+      key = len(self.map) + 1
+      cur.execute("insert into %s (id, %s) values (?, ?)" % (self.table_name, self.value_name), (key, value))
+      self.map[value] = key  # save indicator if record is new
+    return key
+
+  def load_map(self):
+    # load values from table.  Needed if updating database
+    global con, cur
+    assert len(self.map) == 0, "load_map for table '%s' called, but map not empty" % self.table_name
+    result = cur.execute("select id, %s from %s order by %s" % (self.value_name, self.table_name, self.value_name))
+    for row in result:
+      key, value = row
+      self.map[value] = key  # save indicator that record is already in database
+
+  # def save_map(self):
+  #   # saves map in the database
+  #   global con, cur
+  #   # execute insert statements
+  #   print("saving %s, %i rows" % (self.table_name, len(self.map) ))
+  #   for key, vt in sorted(self.map.items(), key = lambda kv:(kv[0], kv[1])):
+  #     # print("%i, %s" % (vt[0], key))
+  #     if vt[1] == 'new':  # only save new records
+  #       cur.execute("insert into %s (id, %s) values (?, ?)" % (self.table_name, self.value_name), (vt[0], key))
+
+# class Prenom_cache:
+# 	# cache values for prenom to allow quick lookup of prenom_id
+# 	# used for prenom and string table
+# 	def __init__(self):
+# 		# maps values to id
+# 		self.cache = {}
+# 		self.load_cache()
+
+# 	def get_id(self, pname):
+# 		global cur
+# 		# get id corresponding to value (which must be a string). Will add value to map if not present
+# 		assert isinstance(pname, str)
+# 		if pname in self.cache:
+# 			pid = self.cache[pname]  # prenom id, 'p' stands for prenome
+# 		else:
+# 			pid = len(self.cache) + 1
+# 			self.cache[pname] = pid  # save indicator if record is new
+# 			cur.execute("insert into prenom (id, name) values (?, ?)", (pid, pname))
+# 		return pid
+
+# 	def load_cache(self):
+# 		# load prenom values from table.  Needed if updating database
+# 		global cur
+# 		assert len(self.cache) == 0, "Prenom_cache load_cache called, but cache not empty"
+# 		result = cur.execute("select id, name from prenom order by id")
+# 		for row in result:
+# 			pid, pname = row
+# 			self.cache[pname] = pid
 
 class Value_mirror:
 	# used for quick lookups of values in value table when building index
@@ -164,19 +210,24 @@ def open_database():
 		cur = con.cursor()
 
 def initialize_caches():
-	global value_mirror, prenom_cache
-	prenom_cache = Prenom_cache()
+	global value_mirror, name_cache, path_cache
+	name_cache = Cache("name", "name")
+	path_cache = Cache("path", "path")
 	value_mirror = Value_mirror()
 
-def get_prenom_id(name):
-	global prenom_cache
-	return prenom_cache.get_id(name)
+def get_name_id(name):
+	global name_cache
+	return name_cache.get_id(name)
 
-def find_file_id(name):
+def get_path_id(path):
+	global path_cache
+	# remove leading slash in path
+	return path_cache.get_id(path.lstrip('/'))
+
+def find_file_id(location):
 	# return file_id if have file in database, otherwise None
 	global con, cur
-	prenom_id = get_prenom_id(name)
-	cur.execute("select id from file where prenom_id = ?", (prenom_id,))
+	cur.execute("select id from file where location = ?", (location,))
 	row = cur.fetchone()
 	if row is None:
 		file_id = None
@@ -184,40 +235,49 @@ def find_file_id(name):
 		file_id = row[0]
 	return file_id
 
-def get_file_id(name):
+def get_file_id(location):
+	# always return file_id, making a new entry in file table if necessary
 	global con, cur
-	file_id = find_file_id(name)
+	file_id = find_file_id(location)
 	if file_id is None:
-		prenom_id = get_prenom_id(name)
-		cur.execute("insert into file (prenom_id) values (?)", (prenom_id,))
+		cur.execute("insert into file (location) values (?)", (location,))
 		file_id = cur.lastrowid
 	return file_id
 
 def save_group(node, parent_id):
 	global con, cur, file_id, groups_with_colnames_attribute
 	base_name = node.name.split('/')[-1]
-	prenom_id = get_prenom_id(base_name)
+	name_id = get_name_id(base_name)
+	# only get path_id if this group has children (e.g. could be a parent in searches)
+	path_id = get_path_id(node.name) if len(node.attrs) > 0 or len(node.keys()) > 0 else None
 	node_type = "g"		# indicates group
 	value_id = None
-	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
-			(file_id, parent_id, prenom_id, node_type, value_id))
+	cur.execute("insert into node (file_id, parent_id, name_id, path_id, node_type, value_id)" +
+		" values (?, ?, ?, ?, ?, ?)", 
+			(file_id, parent_id, name_id, path_id, node_type, value_id))
 	group_id = cur.lastrowid
 	# save attributes
 	for key in node.attrs:
 		value = node.attrs[key]
 		if key == "colnames":
-			groups_with_colnames_attribute[group_id] = value
+			if not isinstance(value, np.ndarray) or not isinstance(value[0], bytes):
+				print("expecting column name to be types bytes, found %s" % (type(value[0]),))
+				import pdb; pdb.set_trace()
+			groups_with_colnames_attribute[group_id] = [ v.decode("utf-8") for v in value]
 		save_attribute(group_id, key, value, node.name + "-" + key)
 	return group_id
 
 def save_dataset(node, parent_id):
 	global con, cur, file_id
 	base_name = node.name.split('/')[-1]
-	prenom_id = get_prenom_id(base_name)
+	name_id = get_name_id(base_name)
+	# only get path_id if this dataset has children (e.g. could be a parent in searches)
+	path_id = get_path_id(node.name) if len(node.attrs) > 0 else None	
 	value_id = get_value_id_from_dataset(node, base_name, parent_id)
 	node_type = "d"  # dataset
-	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
-			(file_id, parent_id, prenom_id, node_type, value_id))
+	cur.execute("insert into node (file_id, parent_id, name_id, path_id, node_type, value_id)" +
+		" values (?, ?, ?, ?, ?, ?)", 
+			(file_id, parent_id, name_id, path_id, node_type, value_id))
 	dataset_id = cur.lastrowid
 	# save attributes
 	for key in node.attrs:
@@ -227,11 +287,13 @@ def save_dataset(node, parent_id):
 
 def save_attribute(parent_id, key, value, attribute_path):
 	global con, cur, file_id
-	prenom_id = get_prenom_id(key)
+	name_id = get_name_id(key)
+	path_id = None	# attributes have not children, don't save path to them (they cannot be the parent)
 	value_id = get_value_id_from_attribute(value, attribute_path)
 	node_type = "a"		# indicates attribute
-	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)",
-		(file_id, parent_id, prenom_id, node_type, value_id))
+	cur.execute("insert into node (file_id, parent_id, name_id, path_id, node_type, value_id)" +
+		" values (?, ?, ?, ?, ?, ?)",
+		(file_id, parent_id, name_id, path_id, node_type, value_id))
 
 def get_node_id(node, parent_id):
 	if isinstance(node,h5py.Group):
@@ -336,8 +398,14 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 		# don't save anything if dataset is empty or too large
 		return None
 	scalar = len(node.shape) == 0
-	if parent_id in groups_with_colnames_attribute and (base_name == "id"
-		or base_name in groups_with_colnames_attribute[parent_id]):
+	if parent_id in groups_with_colnames_attribute:
+		if not (base_name == "id"
+			or base_name in groups_with_colnames_attribute[parent_id]
+			or (base_name.endswith("_index") and 
+				base_name[:-len("_index")] in groups_with_colnames_attribute[parent_id])):
+			# this should never happen
+			print ("dataset inside group with colnames not listed in colnames: %s" % node.name)
+			import pdb; pdb.set_trace()
 		# this dataset is part of a table, save it even if numeric
 		assert not scalar, "Found scalar value where table value expected, %s" % node.name
 		if len(node.shape) > 1:
@@ -359,7 +427,6 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 				print('Warning: not indexing compound type because too big, at %s' % node.name)
 				# don't save compound type if is too big
 				return None
-			assert not scalar, "scalar compound type not supported. found at %s" % node.name
 			colnames = ','.join(node.dtype.names)
 			coldata = ';'.join(format_column(node[cn], node) for cn in node.dtype.names)
 			sval = colnames + '%' + coldata
@@ -374,8 +441,8 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 			vtype = "N"	# N - array of numbers
 			nval =  None
 			sval = ','.join([ "%g" % n for n in node.value ])
-		elif np.issubdtype(node.dtype, np.character):
-			# found string dataset
+		elif np.issubdtype(node.dtype, np.character) or isinstance(node[0], h5py.Reference):
+			# found string dataset or object references (replaced by path to node)
 			sval = format_column(node.value, node)
 			if len(sval) > 10000:
 				print('Warning: not indexing string array because too large, at %s' % node.name)
@@ -383,9 +450,26 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 			nval = None
 			vtype = "M"
 		else:
-			print ("unable to determine type of dataset value at: %s" % node.name)
-			import pdb; pdb.set_trace()
-			return None
+			vlenType = h5py.check_dtype(vlen=node.dtype)
+			if vlenType in (bytes, str):
+				if node.len() > 20:
+					return None
+				vlist = node.value.tolist()
+				if isinstance(vlist[0], bytes):
+					sval = b"'" + b"','".join(vlist) + b"'"	# join bytes
+					sval = sval.decode("utf-8")
+				else:
+					sval = "'" + "','".join(vlist) + "'"	# join string
+				nval = None
+				if len(sval) > 3000:
+					# don't save if total length of string longer than a specific length
+					return None
+				nval = None
+				vtype = "S"
+			else:
+				print ("unable to determine type of dataset value at: %s" % node.name)
+				import pdb; pdb.set_trace()
+				return None
 	# not part of table
 	elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
 		# found numeric dataset
@@ -401,7 +485,7 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 		# found string dataset
 		if scalar:
 			sval = node[()]
-			if len(sval) > 10000:
+			if len(sval) > 3000:
 				# don't save strings longer than a specific length
 				return None
 			if isinstance(sval, bytes):
@@ -418,7 +502,7 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 				sval = sval.decode("utf-8")
 			else:
 				sval = "'" + "','".join(vlist) + "'"	# join string
-			if len(sval) > 10000:
+			if len(sval) > 3000:
 				# don't save if total length of string longer than a specific length
 				return None
 			nval = None
@@ -432,7 +516,7 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 				sval = node[()]
 				if isinstance(sval, bytes):
 					sval = sval.decode("utf-8")  # store as string, not bytes
-				if len(sval) > 10000:
+				if len(sval) > 3000:
 					return None
 				vtype = "s"	# s - single (scalar) string
 				nval = None
@@ -446,7 +530,7 @@ def get_value_id_from_dataset(node, base_name, parent_id):
 				else:
 					sval = "'" + "','".join(vlist) + "'"	# join string
 				nval = None
-				if len(sval) > 10000:
+				if len(sval) > 3000:
 					# don't save if total length of string longer than a specific length
 					return None
 				nval = None
