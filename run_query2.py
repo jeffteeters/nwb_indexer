@@ -3,13 +3,12 @@ import os
 import sqlite3
 import re
 import readline
-import parse
+import parse2
+import make_sql
 readline.parse_and_bind('tab: complete')
 
 
-
-
-default_dbname="nwb_index.db"
+default_dbname="nwb_idx2.db"
 dbname=default_dbname
 con = None     # database connection
 cur = None       # cursor
@@ -24,7 +23,7 @@ def open_database():
 
 def show_available_files():
 	global con, cur
-	result=cur.execute("select p.name from path p, file f where f.path_id = p.id order by p.name")
+	result=cur.execute("select p.name from prenom p, file f where f.prenom_id = p.id order by p.name")
 	rows=result.fetchall()
 	num_rows = len(rows)
 	print("Searching %i files:" % num_rows)
@@ -51,13 +50,11 @@ def get_and_run_queries():
 			query=input("> ")
 		except EOFError:
 			break;
-		# pq = parse_query(query)
-		# if pq:
-		# 	run_query(pq)
-		ti = parse.parse(query)
-		sql = parse.make_sql(ti)
-		print ("sql=\n%s" % sql)
-		run_query(sql)
+		qi = parse2.parse(query)
+		if qi:
+			sql = make_sql.make_sql(qi)
+			print ("sql=\n%s" % sql)
+			run_query(sql)
 	print("\nDone processing all queries")
 
 

@@ -37,7 +37,9 @@ create table node (  -- stores groups, dataseta AND attributes
 
 create table value (			-- value of dataset or attribute
 	id integer primary key,
-	type char(1) not null,		-- either: n-number, s-string, N-number array, S-string array, c-compound
+	type char(1) not null CHECK( type IN ('n','s','N', 'S', 'c','M') ),
+		-- either: n-number, s-string, N-number array, S-string array, c-compound or 2-d
+		-- M - string array part of table (type 'N' and 'c' also part of table)
 	-- compound_cols text,		-- comma seperated list of columns names if compound type, otherwise NULL
 	nval real,					-- contains value of number, if type 'n'.  Otherwise, NULL
 	sval text					-- stores values of type s, N, S, c as comma seperated values otherwise NULL
@@ -97,13 +99,16 @@ class Value_mirror:
 			assert vid == len(self.mirror), "column id in table value expected to be sequential, but is not"
 			if vtype == 'n':
 				self.nval2id[nval] = vid
-			elif sval is not None:
-				self.sval2id[sval] = vid
+			else:
+				assert isinstance(sval, str), "Should have str type sval if type not 'n'"
+				# save type in key to make sure all components match (value and type of value)
+				key = sval + vtype
+				self.sval2id[key] = vid
 		self.original_length = len(self.mirror)  # save original length of table (so will know what is new)
 
 	def get_id(self, vtype, nval, sval):
 		global cur
-		assert vtype in ('n', 'N', 's', 'S', 'c'), 'value vtype invalid: "%s"' % vtype
+		assert vtype in ('n', 'N', 's', 'S', 'c', 'M'), 'value vtype invalid: "%s"' % vtype
 		if vtype == 'n':
 			assert (isinstance(nval, int) or isinstance(nval, float) or nval == "nan") and sval is None, (
 				"value type 'n' not consistent, nval=%s, type=%s, sval=%s, type=%s" %
@@ -119,8 +124,9 @@ class Value_mirror:
 		else:
 			assert isinstance(sval, str) and nval is None, ( 
 				"value type 's' not consisitent, sval='%s', type=%s, nval=%s" % (sval, type(sval), nval))
-			if sval in self.sval2id:
-				vid = self.sval2id[sval]
+			key = sval + vtype
+			if key in self.sval2id:
+				vid = self.sval2id[key]
 				saved_row = self.mirror[vid - 1]
 				assert saved_row[1] == vtype and saved_row[3] == sval, (
 					"value_mirror get_id saved_type '%s' != new vtype '%s' OR saved_value '%s' != new_value '%s'" % (
@@ -131,12 +137,13 @@ class Value_mirror:
 				self.mirror.append ( (vid, vtype, nval, sval) )
 				cur.execute("insert into value (id, type, nval, sval) values (?, ?, ?, ?)" , (
 					vid, vtype, nval, sval) )
-				self.sval2id[sval] = vid
+				self.sval2id[key] = vid
 		return vid
 
 # save id's (node.id) of groups that have the column names attribute.  This used to determine if values
 # should be saved, for NWB 2.x tables with aligned columns or compound tables.
-groups_with_colnames_attribute = []
+# maps the node id to the list of columns obtained from the "colnames" attribute.
+groups_with_colnames_attribute = {}
 
 def open_database():
 	global dbname, schema
@@ -197,9 +204,9 @@ def save_group(node, parent_id):
 	group_id = cur.lastrowid
 	# save attributes
 	for key in node.attrs:
-		if key == "colnames":
-			groups_with_colnames_attribute.append(group_id)
 		value = node.attrs[key]
+		if key == "colnames":
+			groups_with_colnames_attribute[group_id] = value
 		save_attribute(group_id, key, value, node.name + "-" + key)
 	return group_id
 
@@ -207,7 +214,7 @@ def save_dataset(node, parent_id):
 	global con, cur, file_id
 	base_name = node.name.split('/')[-1]
 	prenom_id = get_prenom_id(base_name)
-	value_id = get_value_id_from_dataset(node, parent_id)
+	value_id = get_value_id_from_dataset(node, base_name, parent_id)
 	node_type = "d"  # dataset
 	cur.execute("insert into node (file_id, parent_id, prenom_id, node_type, value_id) values (?, ?, ?, ?, ?)", 
 			(file_id, parent_id, prenom_id, node_type, value_id))
@@ -239,6 +246,7 @@ def get_value_id_from_attribute(value, attribute_path):
 	global fp, value_mirror
 	if isinstance(value, np.ndarray):
 		if len(value.shape) > 1:
+			# don't save multidimensional arrays
 			return None
 		if len(value) == 0:
 			return None	# don't save zero length values
@@ -322,37 +330,64 @@ def get_value_id_from_attribute(value, attribute_path):
 	value_id = value_mirror.get_id(vtype, nval, sval)
 	return value_id
 
-def get_value_id_from_dataset(node, parent_id):
+def get_value_id_from_dataset(node, base_name, parent_id):
 	global fp, value_mirror, groups_with_colnames_attribute
 	if node.size == 0:
 		# don't save anything if dataset is empty or too large
 		return None
 	scalar = len(node.shape) == 0
-	if len(node.shape) > 1:
-		# found dataset with more than one dimension
-		if (parent_id not in groups_with_colnames_attribute or node.size > 10000 or
-			len(node.shape) > 2 or node.shape[1] > 10):
-			# don't store values of multidimensional arrays unless in table group
-			# also, don't store if too big, e.g. image mask table
-			# or if is more then 2 dimensions or if more than 10 columns (arbituary cutoff)
+	if parent_id in groups_with_colnames_attribute and (base_name == "id"
+		or base_name in groups_with_colnames_attribute[parent_id]):
+		# this dataset is part of a table, save it even if numeric
+		assert not scalar, "Found scalar value where table value expected, %s" % node.name
+		if len(node.shape) > 1:
+			# found dataset with more than one dimension
+			if (node.size > 10000 or len(node.shape) > 2 or node.shape[1] > 10):
+				# don't store values of multidimensional arrays unless in table group
+				# also, don't store if too big, e.g. image mask table
+				# or if is more then 2 dimensions or if more than 10 columns (arbituary cutoff)
+				return None
+			# todo - indicate type of data in columns
+			colnames = ','.join([ "%i" % i for i in range(node.shape[1]) ])
+			coldata = ';'.join(format_column(node[:,i], node) for i in range(node.shape[1]))
+			sval = colnames + '%' + coldata
+			nval = None
+			vtype = 'c'
+		elif len(node.dtype) > 1:
+			# found compound type
+			if node.size * len(node.dtype) > 10000:
+				print('Warning: not indexing compound type because too big, at %s' % node.name)
+				# don't save compound type if is too big
+				return None
+			assert not scalar, "scalar compound type not supported. found at %s" % node.name
+			colnames = ','.join(node.dtype.names)
+			coldata = ';'.join(format_column(node[cn], node) for cn in node.dtype.names)
+			sval = colnames + '%' + coldata
+			nval = None
+			vtype = 'c'
+		elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
+			# found numeric dataset
+			if node.size > 10000:
+				# don't save if larger than a threshold
+				print('Warning: not indexing numeric array because too large, at %s' % node.name)
+				return None
+			vtype = "N"	# N - array of numbers
+			nval =  None
+			sval = ','.join([ "%g" % n for n in node.value ])
+		elif np.issubdtype(node.dtype, np.character):
+			# found string dataset
+			sval = format_column(node.value, node)
+			if len(sval) > 10000:
+				print('Warning: not indexing string array because too large, at %s' % node.name)
+				return None	
+			nval = None
+			vtype = "M"
+		else:
+			print ("unable to determine type of dataset value at: %s" % node.name)
+			import pdb; pdb.set_trace()
 			return None
-		colnames = ','.join([ "%i" % i for i in range(node.shape[1]) ])
-		coldata = ';'.join(format_column(node[:,i], node) for i in range(node.shape[1]))
-		sval = colnames + '%' + coldata
-		nval = None
-		vtype = 'c'
-	elif len(node.dtype) > 1:
-		# found compound type
-		if parent_id not in groups_with_colnames_attribute or (node.size * len(node.dtype)) > 10000:
-			# don't save compound type if not in table group or if is too big
-			return None
-		assert not scalar, "scalar compound type not supported. found at %s" % node.name
-		colnames = ','.join(node.dtype.names)
-		coldata = ';'.join(format_column(node[cn], node) for cn in node.dtype.names)
-		sval = colnames + '%' + coldata
-		nval = None
-		vtype = 'c'	
-	elif np.issubdtype(node.dtype, np.number):
+	# not part of table
+	elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
 		# found numeric dataset
 		if node.size == 1:
 			vtype = "n"	# n - single number
@@ -410,6 +445,7 @@ def get_value_id_from_dataset(node, parent_id):
 					sval = sval.decode("utf-8")
 				else:
 					sval = "'" + "','".join(vlist) + "'"	# join string
+				nval = None
 				if len(sval) > 10000:
 					# don't save if total length of string longer than a specific length
 					return None
@@ -447,9 +483,9 @@ def format_column(col, node):
 	elif isinstance(col[0], str):
 		fmt = "'" + "','".join(col) + "'"
 	elif isinstance(col[0], (int, float)):
-		fmt = ",".join(["%s" % x for x in col])
+		fmt = ",".join(["%g" % x for x in col])
 	elif isinstance(col[0], np.number):
-		fmt = ",".join(["%s" % x.item() for x in col])  # convert to python type
+		fmt = ",".join(["%g" % x.item() for x in col])  # convert to python type
 	elif isinstance(col[0], h5py.h5r.Reference):
 		fmt = "'" + "','".join([fp[x].name for x in col]) + "'"  # convert reference to name of target
 	else:
