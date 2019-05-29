@@ -21,6 +21,16 @@ def open_database():
 	con = sqlite3.connect(dbname)
 	cur = con.cursor()
 
+def show_vals(*args):
+    for val in args:
+        print(val)
+    return 1
+
+def add_function():
+	global con
+	con.create_function("check_nwb2_table", 3, show_vals)
+
+
 def show_available_files():
 	global con, cur
 	result=cur.execute("select id, location from file order by id")
@@ -69,6 +79,7 @@ def main():
 	if not os.path.isfile(dbname):
 		sys.exit("ERROR: database '%s' was not found!" % dbname)
 	open_database()
+	add_function()
 	show_available_files()
 	get_and_run_queries()
 	# print ("scanning directory %s" % dir)

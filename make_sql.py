@@ -106,9 +106,16 @@ def make_sql(qi):
 	sql_from = ["""FROM
 	file as f"""]
 	sql_where = []
+	# ploc_expression_where = []	# for storing where clause expressions for each parent location (ploc)
 	alphabet = "abcdefghijklmnopqrstuvwxyz"  # for building name of sql variables
 	# editokens stores edited version of tokens
 	editokens = qi["tokens"].copy()
+	# replace '&' and '|' in editokens expression with AND and OR (what is used in SQL)
+	for i in range(len(qi["tokens"])):
+		if qi['ttypes'][i] == 'AOR':
+			assert(editokens[i] in ('&', '|')), "Expecting & or |, found %s" % editokens[i]
+			editokens[i] = "AND" if editokens[i] == "&" else "OR"
+	# start loop through each parent location (ploc)
 	for cpi	in range(len(qi['plocs'])):  # cpi - current ploc index, iterate over each ploc (subquery)
 		cpi_alpha = alphabet[cpi]  # e.g. "a", "b", "c", ...   ; used to build unique alias names
 		ploc_alias_base = "b" + cpi_alpha	# e.g. "ba" for 1st parent location (ploc), "bb" for 2nd ...
@@ -121,11 +128,17 @@ def make_sql(qi):
 		like_path = qi['plocs'][cpi]['path'].replace("*", "%").lstrip("/")
 		sql_where.append("%s.path LIKE '%s'" % (parent_path_alias, like_path))
 		sql_where.append("%s.id = %s.path_id" % (parent_path_alias, parent_node_alias))
-		sql_where.append("f.id = %s.file_id" % parent_node_alias)		
-		# done appending query parts for parent location (ploc)
+		sql_where.append("f.id = %s.file_id" % parent_node_alias)
+		# colnames node and name alias used to check if a group contains a NWB 2 table
+		colnames_node_alias = "%sn_colnames" % ploc_alias_base
+		colnames_name_alias = "%sna_colnames" % ploc_alias_base
+		sql_from.append("node as %s" % colnames_node_alias)
+		sql_from.append("name as %s" % colnames_name_alias)
+		# done appending query parts for parent location (ploc), except for expression in where
 		# Append query parts for each display child
 		# first make list of all children to display, including display_clocs and those in expression
 		clocs = qi["plocs"][cpi]["display_clocs"] + [ qi["tokens"][i] for i in qi["plocs"][cpi]["cloc_index"] ]
+		custom_call_values = [] # for storing value table elements passed to custom call for nwb 2 table
 		for ic in range(len(clocs)):
 			cloc = clocs[ic]  # actual name of child location
 			if cloc in qi['plocs'][cpi]['cloc_parts']:
@@ -138,14 +151,16 @@ def make_sql(qi):
 			child_value_alias = "%sv" % cloc_alias_base
 			# get child token index if this child is in the expression
 			eti = ic - len(qi["plocs"][cpi]["display_clocs"])  # expression token index
-			cti = qi["plocs"][cpi]["cloc_index"][eti] if eti >= 0 else None
-			if cti:
-				# this child in the expression,
+			cti = qi["plocs"][cpi]["cloc_index"][eti] if eti >= 0 else -1
+			if cti >= 0:
+				# this child in the expression, replace the cloc in editokens with the 'value'
+				# table value for including it in the where clause
 				assert (qi["ttypes"][cti] == "CLOC" and qi["ttypes"][cti+1] in("ROP", "LIKE") and
 					qi["ttypes"][cti+2] in ("NC", "SC")), "tokens do not match expected values"
 				is_string = qi["ttypes"][cti+2] == "SC"
 				value_select = "%s.sval" % child_value_alias if is_string else "%s.nval" % child_value_alias
 				editokens[cti] = value_select
+				custom_call_values.append(value_select)
 			else:
 				# this child is display only, not in expression.  Can't determine type of vaulue (string or number)
 				value_select = "case when %s.type = 'n' then %s.nval else %s.sval end" % (
@@ -158,20 +173,97 @@ def make_sql(qi):
 			sql_where.append("%s.name_id = %s.id" % (child_node_alias, child_name_alias))
 			sql_where.append("%s.name = '%s'" % (child_name_alias, cloc))
 			sql_where.append("%s.id = %s.value_id" % (child_value_alias, child_node_alias))
-			# if this child is in the expression, replace the cloc in editokens with the value
-			#  table value for including in the where clause
-	# done adding query parts for child locations
-	# now add in query expression to where
-	# first replace '&' and '|' in expression with AND and OR (what is used in SQL)
-	for i in range(len(qi["tokens"])):
-		if qi['ttypes'][i] == 'AOR':
-			assert(editokens[i] in ('&', '|')), "Expecting & or |, found %s" % editokens[i]
-			editokens[i] = "AND" if editokens[i] == "&" else "|"
-	sql_where.append("( %s )" % " ".join(editokens))
+		# done adding query parts for child locations.  Now create query expression which will
+		# be added to where clause for this parent location (ploc)
+		i_start = qi['plocs'][cpi]["range"][0]
+		i_end = qi['plocs'][cpi]["range"][1]
+		query_expression = " ".join([t for t in editokens[i_start:i_end]])
+		custom_call = "check_nwb2_table(%i, %s.path, %s)" % (cpi, parent_path_alias, ", ".join(custom_call_values)) # need to fill this in to include cloc values
+		ploc_exp_where = []
+	# 	ploc_exp_where.append('''
+	# case
+	# 	when
+	# 		%s.parent_id = %s.id and
+	# 		''' % (colnames_node_alias, parent_node_alias)
+		ploc_exp_where.append("\tcase")
+		ploc_exp_where.append("\t\twhen")
+		ploc_exp_where.append("\t\t\t%s.parent_id = %s.id and" % (colnames_node_alias, parent_node_alias))		
+		ploc_exp_where.append("\t\t\t%s.node_type = 'a' and" % colnames_node_alias)
+		ploc_exp_where.append("\t\t\t%s.name_id = %s.id and" % (colnames_node_alias, colnames_name_alias))
+		ploc_exp_where.append("\t\t\t%s.name = 'colnames'" % colnames_name_alias)
+		ploc_exp_where.append("\t\tthen")
+		ploc_exp_where.append("\t\t\t%s" % custom_call)
+		ploc_exp_where.append("\t\telse")
+		ploc_exp_where.append("\t\t\t%s.id = 1 and" % colnames_node_alias)			
+		ploc_exp_where.append("\t\t\t%s.id = 1 and" % colnames_name_alias)
+		ploc_exp_where.append("\t\t\t( %s )" % query_expression)		
+		ploc_exp_where.append("\tend")
+		# ploc_expression_where.append("\n".join(ploc_exp_where))
+		sql_where.append("\n".join(ploc_exp_where))
 	# finally, create the sql command
 	sql = ",\n\t".join(sql_select) + "\n" + ",\n\t".join(sql_from) + "\nWHERE\n\t" + " AND\n\t".join(sql_where)
 	return sql
 
+			# if this child is in the expression, replace the cloc in editokens with the value
+			#  table value for including in the where clause
+
+
+
+	# query_sql_expression = "( %s )" % " ".join([t for t in editokens if t])
+	# # add in query components needed to check for nwb2 tables
+	# sql_from.append("")
+
+	# # ?? where exactly should case be located -- at the ploc (parent) level
+
+	# sql_where.append("( %s )" % " ".join(editokens))
+	# # finally, create the sql command
+	# sql = ",\n\t".join(sql_select) + "\n" + ",\n\t".join(sql_from) + "\nWHERE\n\t" + " AND\n\t".join(sql_where)
+	# return sql
+
+# need to make where expression like this:
+'''
+	case
+		when
+			-- colnames attribute is present
+			-- parent_node.type = 'g'
+			-- node_colnames.parent_id = parent_node.id
+			-- node_colnames.type = "a"  -- attribute
+			-- node_colnames.name_id = colnames_name.id
+			-- colnames_name.name = "colnames"
+		then
+			-- call function
+			-- check_nwb2_table(
+			--   cpi, -- current ploc index
+			--   cloc1 val, cloc2 val, ...
+			-- )
+			-- return 1 if found value (save in qr[cpi])
+			-- return 0 if did not find value
+			-- Q: ? what is returned in normal sql variables if value found ?
+			-- A:	The full values (as a string), not individual values
+			--		can maybe fix to use conditional so return null if function called
+		else
+			-- constrain all colnames variables to be one row
+			node_colnames.id = 1
+			colnames_name.name = 1
+	end
+-- query used in previous testing:
+	case
+	    when
+	      n2_colnames.parent_id = n1_e.id and
+	      n2_colnames.path_id = p2_colnames.id and
+	      n2_colnames.node_type = "a" and
+	      p2_colnames.name LIKE "%/colnames" and
+	      v_st1.type = "N" and
+		  v_st1.idx =  s2_st.id
+	   then
+	      cust(s2_st.value, "test constant")
+	   else
+	      v_st1.type = "n" and
+	      s2_st.id = 1 and -- constrain to one row even though not used
+	      n2_colnames.id = 1 and -- constrain to one row even though not used
+	      p2_colnames.id = 1 -- constrain to one row even though not used
+	end
+'''
 
 
 
