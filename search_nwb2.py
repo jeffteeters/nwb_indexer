@@ -6,6 +6,7 @@ import parse2
 import pprint
 import readline
 import re
+import results
 
 # Tool or searching NWB files, both version 1 and 2.
 #
@@ -53,7 +54,7 @@ def convert_to_list(cloc_vals):
 
 def make_subquery_call_string(qi):
 	# build expression that calls runsubquery for each subquery
-	cs_tokens = []
+	cs_tokens = []   # cs == call string, (e.g. call string tokens)
 	cpi = 0  # current ploc index
 	i = 0
 	while i < len(qi['tokens']):
@@ -155,14 +156,20 @@ def runsubquery(cpi, fp, qi, qr):
 				return None
 			ctypes.append(ctype)
 		# found all the children, do search for values, store in query results (qre)
-		qre = {"vind": [], "vrow": []}
+		# qre = {"vind": [], "vrow": []}
 		initialize_editoken(sc, qi)
-		get_individual_values(node, ctypes, qre)	# fills qre["vind"], edits sc["editoken"]
-		found = get_row_values(node, ctypes, qre)	# evals sc["editoken"], fills qre["vrow"]
+		vi_res = results.Vind_result()
+		get_individual_values(node, ctypes, vi_res)	# fills vi_res, edits sc["editoken"]
+		# get_individual_values(node, ctypes, qre)	# fills qre["vind"], edits sc["editoken"]
+		vtbl_res = results.Vtbl_result()
+		found = get_row_values(node, ctypes, vtbl_res)
+		# found = get_row_values(node, ctypes, qre)	# evals sc["editoken"], fills qre["vrow"]
 		if found:
 			# found some results, save them
-			qre["node"] = node.name
-			qr[cpi].append(qre)
+			node_result = results.Node_result(node.name, vi_res, vtbl_res)
+			qr.add_node_result(node_result, cpi)
+			# qre["node"] = node.name
+			# qr[cpi].append(qre)
 		return None
 
 	def get_child_type(node, child):
@@ -217,7 +224,9 @@ def runsubquery(cpi, fp, qi, qr):
 				main in [s.decode("utf-8").strip() for s in node.attrs["colnames"]])
 			return {"type": "dataset", "sstype": sstype, "drow": drow}
 
-	def get_individual_values(node, ctypes, qre):
+	# def get_individual_values(node, ctypes, qre):
+	def get_individual_values(node, ctypes, vi_res):
+		# fills vi_res with individual results, edits sc["editoken"]
 		# fills qre["vind"], edits sc["editoken"]
 		# finds values of individual variables (not part of table) satisifying search criteria
 		# to do that, for each individual variable, evals the binary expression, saving values that
@@ -233,7 +242,8 @@ def runsubquery(cpi, fp, qi, qr):
 			value = load_value(node, child, ctype)
 			if i < len(qi["plocs"][cpi]["display_clocs"]): 
 				# just displaying these values, not part of expression.  Save it.  (display_clocs are first in children)
-				qre["vind"].append([child, ] + value)
+				vi_res.add_vind_value(child, value)
+				# qre["vind"].append([child, ] + value)
 			else:
 				# child is part of expression.  Need to make string for eval to find values
 				# matching criteria, save matching values, and edit sc["editoken"]
@@ -249,7 +259,8 @@ def runsubquery(cpi, fp, qi, qr):
 				found_match = len(matching_values) > 0
 				if found_match:
 					# found values matching result, same them
-					qre["vind"].append([child, ] + matching_values)
+					vi_res.add_vind_value(child, matching_values)
+					# qre["vind"].append([child, ] + matching_values)
 				# edit editoken for future eval.  Replace "cloc rop const" with "True" or "False"
 				sc["editoken"][tindx] = ""
 				sc["editoken"][tindx+1] = "%s" % found_match
@@ -279,7 +290,8 @@ def runsubquery(cpi, fp, qi, qr):
 			value = [fp[n].name for n in value]
 		return value
 
-	def get_row_values(node, ctypes, qre):
+	# def get_row_values(node, ctypes, qre):
+	def get_row_values(node, ctypes, vtbl_res):
 		# evals sc["editoken"], fills qre["vrow"]
 		# does search for rows within a table stored as datasets with aligned columns, some of which
 		# might have an associated index array.
@@ -365,7 +377,8 @@ def runsubquery(cpi, fp, qi, qr):
 			# print("str_filt=%s" % str_filt)
 			result = list(eval(str_filt))
 			if len(result) > 0:
-				qre["vrow"].append([cnames, ] + result)
+				vtbl_res.set_tbl_result(cnames, result)
+				# qre["vrow"].append([cnames, ] + result)
 				result = True
 			else:
 				result = False
@@ -382,25 +395,30 @@ def runsubquery(cpi, fp, qi, qr):
 	if sc['search_all'] and isinstance(start_node,h5py.Group):
 		start_node.visititems(search_node)
 	# qr[cpi] = "cpi=%i, ploc=%s, sc=%s" % (cpi, qi["plocs"][cpi]["path"], sc)
-	found = len(qr[cpi]) > 0  # will have content if result found
+	# found = len(qr[cpi]) > 0  # will have content if result found
+	found = qr.get_subquery_length(cpi) > 0	# will have length > 1 if result found
 	return found
 
-def display_result(path, qr):
-	print("file %s:" % path)
-	pp.pprint(qr)
+# def display_result(path, qr):
+# 	print("file %s:" % path)
+# 	pp.pprint(qr)
 
 def query_file(path, qi):
+	global compiled_query_results
 	fp = h5py.File(path, "r")
 	if not fp:
 		sys.exit("Unable to open %s" % path)
 	# for storing query results
-	qr = [[] for i in range(len(qi["plocs"]))]
+	# qr = [[] for i in range(len(qi["plocs"]))]
+	# initialize File_result object for storing subquery results
+	qr = results.File_result(path, len(qi["plocs"]))
 	subquery_call_string = make_subquery_call_string(qi)
 	# print("%s" % subquery_call_string)
 	# will be like: runsubquery(0,fp,qi,qr) & runsubquery(1,fp,qi,qr)
 	result = eval(subquery_call_string)
 	if result:
-	 	display_result(path, qr)
+		compiled_query_results.add_file_result(qr)
+	 	# display_result(path, qr)
 
 def query_directory(dir, qi):
 	# must find files to query.  dir must be a directory
@@ -413,10 +431,17 @@ def query_directory(dir, qi):
 
 def query_file_or_directory(path, qi):
 	# run a query on path, query specified in qi (query information, made in parse2.parse)
+	global compiled_query_results
+	# initialize results for storing result of query
+	compiled_query_results = results.Results()
 	if os.path.isfile(path):
 		query_file(path, qi)
 	else:
 		query_directory(path, qi)
+	num_files_matching = compiled_query_results.get_num_files()
+	print("Found %i matching files:" % num_files_matching)
+	if num_files_matching > 0:
+		pp.pprint( compiled_query_results.get_value() )
 
 def do_interactive_queries(path):
 	print("Enter query, control-d to quit")
