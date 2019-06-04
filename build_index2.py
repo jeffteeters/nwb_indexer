@@ -48,7 +48,6 @@ create table value (			-- value of dataset or attribute
 	type char(1) not null CHECK( type IN ('n','s','N', 'S', 'c','M') ),
 		-- either: n-number, s-string, N-number array, S-string array, c-compound or 2-d
 		-- M - string array part of table (type 'N' and 'c' also part of table)
-		-- TODO ?: remove M because should not matter if string array is part of table or not
 	-- compound_cols text,		-- comma seperated list of columns names if compound type, otherwise NULL
 	nval real,					-- contains value of number, if type 'n'.  Otherwise, NULL
 	sval text					-- stores values of type s, N, S, c as comma seperated values otherwise NULL
@@ -500,7 +499,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 					return None
 				sval += index_values	# append index_values if present
 				nval = None
-				vtype = "S"
+				vtype = "M"
 			else:
 				print ("unable to determine type of dataset value at: %s" % node.name)
 				import pdb; pdb.set_trace()

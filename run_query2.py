@@ -125,16 +125,18 @@ class Cloc_info_manager:
 
 		# start of main body of get_sql_query_results
 		qi = self.qi
-		sql_maker = make_sql.SQL_maker(qi)
+		# sql_maker = make_sql.SQL_maker(qi)
 		# sqr - for storing sub query results.  Format is like:
 		# { file_id: { "file_name": <file_name>, 0: <sq0_results>, 1: <sq1_results>, ... }
 		# where <sqN_results> is [ <node1>, <node2>, <node3> ...  ]
 		# and <nodeN> is { "node": <node_name>, "vind": <vind_results>, "vrow": <vrow_results> }
 		sqr = {}
 		for pi in range(len(qi["plocs"])):
-			sql = sql_maker.make_normal_sql(pi)
+			# sql = sql_maker.make_normal_sql(pi)
+			sql = make_sql.make_sql(qi, pi, "normal")
 			do_sql_query(sql, sqr, pi, "vind")
-			sql = sql_maker.make_table_sql()
+			# sql = sql_maker.make_table_sql()
+			sql = make_sql.make_sql(qi, pi, "table")
 			print("table sql is: %s" % sql)
 			do_sql_query(sql, sqr, pi, "vrow")
 		# save it in object
@@ -207,6 +209,8 @@ class Cloc_info_manager:
 			query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
 				"node_type": node_type, "using_index": using_index}
 		self.query_children_info = query_children_info
+		print("query_children_info = ")
+		pp.pprint(self.query_children_info)
 
 	def decode_sql_value(self, subscript, packed_value, value_type):
 		# convert packed_value (saved as string in sqlite) into list that can be used directly
@@ -245,7 +249,6 @@ class Cloc_info_manager:
 			value = [packed_value, ]  # convert to list with one element
 		elif value_type == 'N' or (value_type == 'c' and packed_value[0] != "'"):
 			# list of numbers.  (list of strings start with "'"):
-			import pdb; pdb.set_trace()
 			value = list(map(float, packed_value.split(',')))
 		else:
 			# should be array of strings
