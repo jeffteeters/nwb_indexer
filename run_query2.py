@@ -67,17 +67,14 @@ class Cloc_info_manager:
 
 	def set_ploc_index(self, pi):
 		# pi is index to current ploc (parent location).  It is the second component of the self.sqr
-		assert pi in self.sqr[self.file_id]
+		assert pi >= 0 and pi < len(self.sqr[self.file_id]["sq"])
 		self.pi = pi
 		self.compute_query_children()
 		self.node_index = None 	# make sure set_node_index always called after this
 
 	def get_number_of_nodes(self):
 		# return number of nodes in query result for current file and ploc location
-		if self.pi in self.sqr[self.file_id]:
-			return len(self.sqr[self.file_id][self.pi])
-		else:
-			return 0
+		return len(self.sqr[self.file_id]["sq"][self.pi])
 
 	def set_node_index(self, node_index):
 		# set node index used in get_sql_child_info and get_query_child_info
@@ -86,7 +83,7 @@ class Cloc_info_manager:
 		self.compute_children_info()
 
 	def get_node_name(self):
-		return self.sqr[self.file_id][self.pi][self.node_index]["node"]
+		return self.sqr[self.file_id]["sq"][self.pi][self.node_index]["node"]
 
 	def get_query_children(self):
 		return self.query_children
@@ -99,7 +96,7 @@ class Cloc_info_manager:
 
 	def compute_sql_query_results(self):
 		# gets results of sql query for ALL plocs (parent locations).  Saves in self.sqr
-		def do_sql_query(sql, sqr, pi, result_type):
+		def do_sql_query(sql, sqr, pi, result_type, num_plocs):
 				# execute query sql, saving in dict results using key 'result_type'.
 				# pi is the parent (ploc) index
 				global cur
@@ -114,31 +111,34 @@ class Cloc_info_manager:
 					node_path = row[2]
 					node_type = row[3]
 					if file_id not in sqr:
-						sqr[file_id] = { "file_name": file_name, pi: [ {"node": node_path,
-							"node_type": node_type, result_type: row[4:] } ]}
-					elif pi not in sqr[file_id]:
-						sqr[file_id][pi] = [ {"node": node_path,
-							"node_type": node_type, result_type: row[4:] } ]
-					else:
-						sqr[file_id][pi].append ( {"node": node_path,
+						sq = [ [] for i in range(num_plocs) ] 
+						sqr[file_id] = { "file_name": file_name, "sq": sq }
+					sqr[file_id]["sq"][pi].append ( {"node": node_path,
 							"node_type": node_type, result_type: row[4:] } )
+
+					# elif pi not in sqr[file_id]:
+					# 	sqr[file_id][pi] = [ {"node": node_path,
+					# 		"node_type": node_type, result_type: row[4:] } ]
+					# else:
+					# 	sqr[file_id][pi].append ( {"node": node_path,
+					# 		"node_type": node_type, result_type: row[4:] } )
 
 		# start of main body of get_sql_query_results
 		qi = self.qi
 		# sql_maker = make_sql.SQL_maker(qi)
-		# sqr - for storing sub query results.  Format is like:
-		# { file_id: { "file_name": <file_name>, 0: <sq0_results>, 1: <sq1_results>, ... }
+		# sqr - for storing sub query results.  Format is:
+		# { file_id: { "file_name": <file_name>, "sq": [ <sq0_results>, <sq1_results>, ... ]}
 		# where <sqN_results> is [ <node1>, <node2>, <node3> ...  ]
 		# and <nodeN> is { "node": <node_name>, "vind": <vind_results>, "vrow": <vrow_results> }
 		sqr = {}
-		for pi in range(len(qi["plocs"])):
-			# sql = sql_maker.make_normal_sql(pi)
+		num_plocs = len(qi["plocs"])
+		for pi in range(num_plocs):
 			sql = make_sql.make_sql(qi, pi, "normal")
-			do_sql_query(sql, sqr, pi, "vind")
-			# sql = sql_maker.make_table_sql()
+			print("normal sql is: %s" % sql)
+			do_sql_query(sql, sqr, pi, "vind", num_plocs)
 			sql = make_sql.make_sql(qi, pi, "table")
 			print("table sql is: %s" % sql)
-			do_sql_query(sql, sqr, pi, "vrow")
+			do_sql_query(sql, sqr, pi, "vrow", num_plocs)
 		# save it in object
 		self.sqr = sqr
 		print("sqr = ")
@@ -161,7 +161,7 @@ class Cloc_info_manager:
 		# create sql_children_info dictionary, which contains info about children returned by sql queries
 		# (that is, for each child stored in sqr for the current parent). Has form:
 		# { child_name: { "node_type": <node_type>, "value_type": <value_type>, "value": <value> }}
-		node_qr = self.sqr[self.file_id][self.pi][self.node_index]
+		node_qr = self.sqr[self.file_id]["sq"][self.pi][self.node_index]
 		children_info = {}
 		# each node query result should have either key "vind" or "vrow"
 		assert "vind" in node_qr or "vrow" in node_qr
@@ -228,6 +228,11 @@ class Cloc_info_manager:
 			# either subscript needed and not present or present and not needed.  In either case
 			# value required (from query) does not match value stored
 			return None
+		# check for numeric scalar
+		if value_type == 'n':
+			value = [packed_value, ] # return list of one number
+			using_index = False
+			return (value, using_index)
 		# strip off "_index" values if present
 		packed_value, separator, packed_index_values = packed_value.partition(";i;")
 		using_index = packed_index_values != ''
