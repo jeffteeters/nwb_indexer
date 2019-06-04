@@ -123,18 +123,7 @@ def like(pattern, text):
 
 def runsubquery(cpi, fp, qi, qr):
 	# run subquery with current ploc_index cpi, h5py pointer fp, and query information (qi)
-	# store search results in qr[cpi] (qr is a list, cpi is the index to each element)/
-	# qr[cpi] is also a list.  Each element is a dictionary with the following format:
-	# {"node": "/path/to/parent/node",
-	#  "vind": [
-	#            [cname1, val11, val12, val13, ...], [cname2, val21, val22, val23, ...] # cname - child name
-	#          ]
-	#  "vrow": [   # for values stored in tables, need to return rows
-	#			 [col1Name,  col2name,  col3name, ...]  # the headers
-	#			 [col1val1,  col2val1,  col3val1, ...]  # a tuple for each set of values found
-	#			 [col1val2,  col2val2,  col3val2, ...]
-	#          ]
-	# }
+	# store search results in qr, which is a results.File_result object (see file results.py).
 	# return True if search results found, False otherwise
 
 	def search_node(name, node):
@@ -160,10 +149,8 @@ def runsubquery(cpi, fp, qi, qr):
 		initialize_editoken(sc, qi)
 		vi_res = results.Vind_result()
 		get_individual_values(node, ctypes, vi_res)	# fills vi_res, edits sc["editoken"]
-		# get_individual_values(node, ctypes, qre)	# fills qre["vind"], edits sc["editoken"]
 		vtbl_res = results.Vtbl_result()
 		found = get_row_values(node, ctypes, vtbl_res)
-		# found = get_row_values(node, ctypes, qre)	# evals sc["editoken"], fills qre["vrow"]
 		if found:
 			# found some results, save them
 			node_result = results.Node_result(node.name, vi_res, vtbl_res)
@@ -224,10 +211,8 @@ def runsubquery(cpi, fp, qi, qr):
 				main in [s.decode("utf-8").strip() for s in node.attrs["colnames"]])
 			return {"type": "dataset", "sstype": sstype, "drow": drow}
 
-	# def get_individual_values(node, ctypes, qre):
 	def get_individual_values(node, ctypes, vi_res):
-		# fills vi_res with individual results, edits sc["editoken"]
-		# fills qre["vind"], edits sc["editoken"]
+		# fills vi_res (a results.Vind_result object) with individual results, edits sc["editoken"]
 		# finds values of individual variables (not part of table) satisifying search criteria
 		# to do that, for each individual variable, evals the binary expression, saving values that
 		# result in True.  Edit sc["editoken"] replacing: var op const with True or False in
@@ -243,7 +228,6 @@ def runsubquery(cpi, fp, qi, qr):
 			if i < len(qi["plocs"][cpi]["display_clocs"]): 
 				# just displaying these values, not part of expression.  Save it.  (display_clocs are first in children)
 				vi_res.add_vind_value(child, value)
-				# qre["vind"].append([child, ] + value)
 			else:
 				# child is part of expression.  Need to make string for eval to find values
 				# matching criteria, save matching values, and edit sc["editoken"]
@@ -260,7 +244,6 @@ def runsubquery(cpi, fp, qi, qr):
 				if found_match:
 					# found values matching result, same them
 					vi_res.add_vind_value(child, matching_values)
-					# qre["vind"].append([child, ] + matching_values)
 				# edit editoken for future eval.  Replace "cloc rop const" with "True" or "False"
 				sc["editoken"][tindx] = ""
 				sc["editoken"][tindx+1] = "%s" % found_match
@@ -290,14 +273,13 @@ def runsubquery(cpi, fp, qi, qr):
 			value = [fp[n].name for n in value]
 		return value
 
-	# def get_row_values(node, ctypes, qre):
 	def get_row_values(node, ctypes, vtbl_res):
-		# evals sc["editoken"], fills qre["vrow"]
+		# evals sc["editoken"], stores results in vtbl_res (a results.Vtbl_result object)
 		# does search for rows within a table stored as datasets with aligned columns, some of which
 		# might have an associated index array.
 		# Does this by getting all values from the columns, using zip to create aligned tuples
 		# and making expression that can be run using eval, with filter function.
-		# Store found values in qre["vrow"] and return True if expression evaluates as True, otherwise
+		# Store found values in vtbl_res and return True if expression evaluates as True, otherwise
 		# False.
 		nonlocal sc, cpi, fp, qi
 		cvals = []   # for storing all the column values
@@ -378,7 +360,6 @@ def runsubquery(cpi, fp, qi, qr):
 			result = list(eval(str_filt))
 			if len(result) > 0:
 				vtbl_res.set_tbl_result(cnames, result)
-				# qre["vrow"].append([cnames, ] + result)
 				result = True
 			else:
 				result = False
@@ -395,7 +376,6 @@ def runsubquery(cpi, fp, qi, qr):
 	if sc['search_all'] and isinstance(start_node,h5py.Group):
 		start_node.visititems(search_node)
 	# qr[cpi] = "cpi=%i, ploc=%s, sc=%s" % (cpi, qi["plocs"][cpi]["path"], sc)
-	# found = len(qr[cpi]) > 0  # will have content if result found
 	found = qr.get_subquery_length(cpi) > 0	# will have length > 1 if result found
 	return found
 

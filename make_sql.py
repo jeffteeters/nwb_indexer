@@ -61,13 +61,15 @@ class SQL_maker:
 		return sql
 
 	def merge_parts(self, sql_select, sql_from, sql_where):
-		sql = ",\n\t".join(sql_select) + "\n" + ",\n\t".join(sql_from) + "\nWHERE\n\t" + " AND\n\t".join(sql_where)
+		sql = ("SELECT\n\t" + ",\n\t".join(sql_select)
+			+ "\nFROM\n\t" + ",\n\t".join(sql_from)
+			+ "\nWHERE\n\t" + " AND\n\t".join(sql_where))
 		return sql
 
 	def build_sql_parts(self):
 		# create query parts using self.qi and self.cpi
-		sql_select = ["SELECT\n\tf.location as file"]
-		sql_from = ["FROM\n\tfile as f"]
+		sql_select = ["f.id as file_id", "f.location as file"]
+		sql_from = ["file as f"]
 		sql_where = []
 		sql_colnames_select = []
 		sql_colnames_from = []
@@ -89,6 +91,7 @@ class SQL_maker:
 		parent_path_alias = "%sp" % ploc_alias_base
 		parent_node_alias = "%sn" % ploc_alias_base
 		sql_select.append("%s.path as parent_%s" % (parent_path_alias, cpi_alpha))	# select the parent path
+		sql_select.append("%s.node_type as node_type" % parent_node_alias)
 		sql_from.append("node as %s" % parent_node_alias)
 		sql_from.append("path as %s" % parent_path_alias)
 		# replace '*' in path with '%' for LIKE operator and remove any leading '/' for searching
@@ -104,7 +107,9 @@ class SQL_maker:
 		sql_colnames_from.append("name as %s" % colnames_name_alias)
 		sql_colnames_from.append("value as %s" % colnames_value_alias)
 		sql_colnames_where.append("%s.value_id = %s.id" % (colnames_node_alias, colnames_value_alias))
-		sql_colnames_select.append("%s.sval as %s" % (colnames_value_alias, colnames_name_alias))
+		# commented out below line because do not need colnames in results
+		# sql_colnames_select.append("%s.sval as %s" % (colnames_value_alias, colnames_name_alias))
+
 		# done appending query parts for parent location (ploc), except for expression in where
 		# Append query parts for each display child
 		# first make list of all children to display, including display_clocs and those in expression
@@ -123,6 +128,7 @@ class SQL_maker:
 			# get child token index if this child is in the expression
 			eti = ic - len(qi["plocs"][cpi]["display_clocs"])  # expression token index
 			cti = qi["plocs"][cpi]["cloc_index"][eti] if eti >= 0 else -1
+			# perhaps try using case all of the time (value type 'N' will still be numeric)
 			if cti >= 0:
 				# this child in the expression, replace the cloc in editokens with the 'value'
 				# table value for including it in the where clause
@@ -136,7 +142,10 @@ class SQL_maker:
 				# this child is display only, not in expression.  Can't determine type of vaulue (string or number)
 				value_select = "case when %s.type = 'n' then %s.nval else %s.sval end" % (
 					child_value_alias, child_value_alias, child_value_alias)
-			sql_select.append("%s as %s" % (value_select, cloc))
+			sql_select.append("'%s'" % cloc)  # include name of child location in select
+			sql_select.append("%s.node_type as node_type" % child_node_alias)  # include node_type in select
+			sql_select.append("%s.type as type" % child_value_alias)  # include value_type in select
+			sql_select.append("%s as %s_value" % (value_select, cloc))
 			sql_from.append("value as %s" % child_value_alias)
 			sql_from.append("node as %s" % child_node_alias)
 			sql_from.append("name as %s" % child_name_alias)
@@ -345,6 +354,7 @@ def make_sql_old(qi):
 			cloc = clocs[ic]  # actual name of child location
 			if cloc in qi['plocs'][cpi]['cloc_parts']:
 				# skip this child since it has components (is part of table).  Those managed by callback.
+				# TODO: need to include these, and check to make sure not duplicate values
 				continue
 			# add child location to select since it does not have subcomponents
 			cloc_alias_base = "%s%i" % (ploc_alias_base, ic) # e.g. "ba0" for 1st parent, 1st child; bb3 -2nd parent, 4rd child

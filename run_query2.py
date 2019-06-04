@@ -6,6 +6,8 @@ import readline
 import parse2
 import make_sql
 import pprint
+import results
+
 readline.parse_and_bind('tab: complete')
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -22,16 +24,6 @@ def open_database(db_path):
 	con = sqlite3.connect(db_path)
 	cur = con.cursor()
 
-# def show_vals(*args):
-#     for val in args:
-#         print(val)
-#     return 1
-
-# def add_function():
-# 	global con
-# 	con.create_function("check_nwb2_table", 3, show_vals)
-
-
 def show_available_files():
 	global con, cur
 	result=cur.execute("select id, location from file order by id")
@@ -43,407 +35,434 @@ def show_available_files():
 		n += 1
 		print("%i. %s" % (row))
 
-# def run_query(sql):
-# 	global con, cur
-# 	result=cur.execute(sql)
-# 	rows=result.fetchall()
-# 	num_rows = len(rows)
-# 	print("Found %i:" % num_rows)
-# 	n = 0
-# 	for row in rows:
-# 		n += 1
-# 		print("%i. %s" % (n, row))
+class Cloc_info_manager:
+	# manages information about child locations within each parent location
+	# Is used by the following call sequence:
+	# 1. Cloc_info_manager(qi)  - Initialize for all subsequent calls
+	# 2. set_file_id(file_id)  - Specify file_id for query result
+	# 3. set_ploc_index(pi)   - Specify which ploc (parent location, e.g. subquery) for query result
+	# 4. get_number_of_nodes() - returns number of nodes found for specified file_id, and pi
+	#			Used so calling routine knows how many nodes were returned and can can call set_node_index
+	# 5. set_node_index(node_index) - Specifies node index (index of group or dataset) for obtaining results
+	# 6. get_child_info - returns dictionary "query_child_info" which has value of each child to use in query
 
-# def get_and_run_queries():
-# 	print("Enter query, control-d to quit")
-# 	while True:
-# 		try:
-# 			query=input("> ")
-# 		except EOFError:
-# 			break;
-# 		qi = parse2.parse(query)
-# 		if qi:
-# 			sql = make_sql.make_sql(qi)
-# 			print ("sql=\n%s" % sql)
-# 			run_query(sql)
-# 	print("\nDone processing all queries")
+	# for finding values (in sqlite3 database) associated with child locations (cloc's) in query
+	def __init__(self, qi):
+		# qi is query information, output of parse2.
+		self.qi = qi
+		self.compute_sql_query_results()
 
+	def get_file_ids(self):
+		# return list of file_ids that are in sql_query_results (self.sqr)
+		return sorted(self.sqr)
 
-# def main_old():
-# 	global con, dbname
-# 	if len(sys.argv) > 2:
-# 		sys.exit('Usage: %s [ <db.sqlite3> ]' % sys.argv[0])
-# 	if len(sys.argv) == 1:
-# 		print("Database not specified; using '%s'" % dbname)
-# 	else:
-# 		dbname=sys.argv[1]
-# 	if not os.path.isfile(dbname):
-# 		sys.exit("ERROR: database '%s' was not found!" % dbname)
-# 	open_database()
-# 	add_function()
-# 	show_available_files()
-# 	get_and_run_queries()
-# 	# print ("scanning directory %s" % dir)
-# 	# scan_directory(dir)
-# 	con.close()
+	def set_file_id(self, file_id):
+		# file_id in first subscript in self.sqr (made by get_sql_query_results)
+		self.file_id = file_id
+		self.ploc_index = None 	# make sure set_ploc_index called after this
 
+	def get_file_name(self):
+		# return name of current file being processed
+		return self.sqr[self.file_id]["file_name"]
 
-def do_query(sql, results, result_type):
-	# execute query, saving in dict results using key 'result_type'
-	global cur
-	assert result_type in ("vind", "vrow")
-	result=cur.execute(sql)
-	rows=result.fetchall()
-	for row in rows:
-		file = row[0]
-		node_path = row[1]
-		if file not in results:
-			results[file] = {node_path: {result_type: row[2:]}}
-		elif node_path not in results[file]:
-			results[file][node_path] = {result_type: row[2:]}
-		elif result_type not in results[file][node_path]:
-			results[file][node_path][result_type] = row[2:]
+	def set_ploc_index(self, pi):
+		# pi is index to current ploc (parent location).  It is the second component of the self.sqr
+		assert pi in self.sqr[self.file_id]
+		self.pi = pi
+		self.compute_query_children()
+		self.node_index = None 	# make sure set_node_index always called after this
+
+	def get_number_of_nodes(self):
+		# return number of nodes in query result for current file and ploc location
+		if self.pi in self.sqr[self.file_id]:
+			return len(self.sqr[self.file_id][self.pi])
 		else:
-			sys.exit("multiple results found for %s, %s, %s" % (file, node_path, result_type))
+			return 0
 
-def runsubquery(cpi, qi, qr):
-	# run subquery with current ploc_index cpi and query information (qi)
-	# store search results in qr[cpi] (qr is a list, cpi is the index to each element)/
-	# qr[cpi] is also a list.  Each element is a dictionary with the following format:
-	# {"node": "/path/to/parent/node",
-	#  "vind": [
-	#            [cname1, val11, val12, val13, ...], [cname2, val21, val22, val23, ...] # cname - child name
-	#          ]
-	#  "vrow": [   # for values stored in tables, need to return rows
-	#			 [col1Name,  col2name,  col3name, ...]  # the headers
-	#			 [col1val1,  col2val1,  col3val1, ...]  # a tuple for each set of values found
-	#			 [col1val2,  col2val2,  col3val2, ...]
-	#          ]
-	# }
+	def set_node_index(self, node_index):
+		# set node index used in get_sql_child_info and get_query_child_info
+		assert node_index >= 0 and node_index < self.get_number_of_nodes()
+		self.node_index = node_index
+		self.compute_children_info()
+
+	def get_node_name(self):
+		return self.sqr[self.file_id][self.pi][self.node_index]["node"]
+
+	def get_query_children(self):
+		return self.query_children
+
+	def get_children_info(self):
+		return self.query_children_info
+
+
+	# methods below are not meant to be called only internally (e.g. are private)
+
+	def compute_sql_query_results(self):
+		# gets results of sql query for ALL plocs (parent locations).  Saves in self.sqr
+		def do_sql_query(sql, sqr, pi, result_type):
+				# execute query sql, saving in dict results using key 'result_type'.
+				# pi is the parent (ploc) index
+				global cur
+				assert result_type in ("vind", "vrow")
+				result=cur.execute(sql)
+				rows=result.fetchall()
+				print("sql query result for %s" % result_type)
+				pp.pprint(rows)
+				for row in rows:
+					file_id = row[0]
+					file_name = row[1]
+					node_path = row[2]
+					node_type = row[3]
+					if file_id not in sqr:
+						sqr[file_id] = { "file_name": file_name, pi: [ {"node": node_path,
+							"node_type": node_type, result_type: row[4:] } ]}
+					elif pi not in sqr[file_id]:
+						sqr[file_id][pi] = [ {"node": node_path,
+							"node_type": node_type, result_type: row[4:] } ]
+					else:
+						sqr[file_id][pi].append ( {"node": node_path,
+							"node_type": node_type, result_type: row[4:] } )
+
+		# start of main body of get_sql_query_results
+		qi = self.qi
+		sql_maker = make_sql.SQL_maker(qi)
+		# sqr - for storing sub query results.  Format is like:
+		# { file_id: { "file_name": <file_name>, 0: <sq0_results>, 1: <sq1_results>, ... }
+		# where <sqN_results> is [ <node1>, <node2>, <node3> ...  ]
+		# and <nodeN> is { "node": <node_name>, "vind": <vind_results>, "vrow": <vrow_results> }
+		sqr = {}
+		for pi in range(len(qi["plocs"])):
+			sql = sql_maker.make_normal_sql(pi)
+			do_sql_query(sql, sqr, pi, "vind")
+			sql = sql_maker.make_table_sql()
+			print("table sql is: %s" % sql)
+			do_sql_query(sql, sqr, pi, "vrow")
+		# save it in object
+		self.sqr = sqr
+		print("sqr = ")
+		pp.pprint(self.sqr)
+
+	def compute_query_children(self):
+		# get list of children (attributes or datasets) specified in query
+		qi = self.qi
+		pi = self.pi
+		query_children = qi["plocs"][pi]["display_clocs"].copy()
+		for i in qi["plocs"][pi]["cloc_index"]:
+			query_children.append(qi["tokens"][i])
+		self.query_children = query_children
+
+	def compute_children_info(self):
+		self.compute_sql_children_info()
+		self.compute_query_children_info()
+
+	def compute_sql_children_info(self):
+		# create sql_children_info dictionary, which contains info about children returned by sql queries
+		# (that is, for each child stored in sqr for the current parent). Has form:
+		# { child_name: { "node_type": <node_type>, "value_type": <value_type>, "value": <value> }}
+		node_qr = self.sqr[self.file_id][self.pi][self.node_index]
+		children_info = {}
+		# each node query result should have either key "vind" or "vrow"
+		assert "vind" in node_qr or "vrow" in node_qr
+		qtype = "vind" if "vind" in node_qr else "vrow"
+		for i in range(0, len(node_qr[qtype]), 4):
+			child_name = node_qr[qtype][i]
+			node_type = node_qr[qtype][i+1]  # type of child node, not parent node
+			value_type = node_qr[qtype][i+2]
+			value = node_qr[qtype][i+3]
+			# safety check
+			assert value_type in ('n','s','N', 'S', 'c','M')
+			assert node_type in ('g', 'd', 'a', 'G')
+			# assert child_name in children
+			children_info[child_name] = { "node_type": node_type, "value_type": value_type, "value": value }
+		self.sql_children_info = children_info
+		print("sql_children_info = ")
+		pp.pprint(self.sql_children_info)
+
+	def compute_query_children_info(self):
+		# create query_children_info dictionary, which for each child specified in query, has form:
+		# { query_child_name: { "node_type": <attribute | dataset>,
+		#		"drow": True | False, "decoded_value": <value>, "using_index": True | False} }
+		# return None if not all children are found (which might happen if a subscript is not present
+		# in the found sql value. In other words, the child_name in the query may have a subscript,
+		# but the child name in the sql results will never have a subscript.  If the subscript
+		# spqcified on the query (by the user) is not in the value of the SQL query, for ANY of the
+		# query children, store None (since all values are required for the query to match).
+		query_children_info = {}
+		for query_child in self.query_children:
+			# check for subscript on query_child
+			if query_child in self.qi["plocs"][self.pi]["cloc_parts"]:
+				child, subscript = self.qi["plocs"][self.pi]["cloc_parts"][query_child]
+			else:
+				child = query_child
+				subscript = None
+			sql_ci = self.sql_children_info[child]
+			decoded_value, using_index = self.decode_sql_value(subscript, sql_ci["value"], sql_ci["value_type"])
+			if decoded_value is None:
+				# specified subscript not found, so unable to obtain value for this child
+				self.query_children_info = None
+				return
+			drow = sql_ci["value_type"] in ("N", "c", "M")  # set true if part of dynamic row
+			assert sql_ci["node_type"] in ("d", "a")  # should be either attribute or dataset
+			node_type = "attribute" if sql_ci["node_type"] == "a" else "Dataset"
+			query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
+				"node_type": node_type, "using_index": using_index}
+		self.query_children_info = query_children_info
+
+	def decode_sql_value(self, subscript, packed_value, value_type):
+		# convert packed_value (saved as string in sqlite) into list that can be used directly
+		# for evaluating expression.
+		# subscript is subscript used to access value stored in column of array or None if not
+		# present.
+		# value_type is "c" if subscript needed, otherwise something else
+		# all possible value types are: ('n','s','N', 'S', 'c','M'),
+		# -- either: n-number, s-string, N-number array, S-string array, c-compound or 2-d
+		# -- M - string array part of table (type 'N' and 'c' also part of table)
+		assert value_type in ('n','s','N', 'S', 'c','M')
+		subscript_needed = value_type == "c"
+		have_subscript = subscript is not None
+		if subscript_needed != have_subscript:
+			# either subscript needed and not present or present and not needed.  In either case
+			# value required (from query) does not match value stored
+			return None
+		# strip off "_index" values if present
+		packed_value, separator, packed_index_values = packed_value.partition(";i;")
+		using_index = packed_index_values != ''
+		# if subscript used, extract specified column
+		if have_subscript:
+			subscripts, semicolon, concatenated_columns = sql_ci["value"].partition(";")
+			available_subscripts = subscripts.split(",")
+			found_subscript = subscript in available_subscripts
+			if found_subscript:
+				index = available_subscripts.index(subscript)
+				packed_value = concatenated_values.split(";")[index]
+			else:
+				# specified subscript not found
+				return None
+		# unpack packed_values
+		if value_type == "n":
+			value = list(float(packed_value))
+		elif value_type == 's':
+			value = [packed_value, ]  # convert to list with one element
+		elif value_type == 'N' or (value_type == 'c' and packed_value[0] != "'"):
+			# list of numbers.  (list of strings start with "'"):
+			import pdb; pdb.set_trace()
+			value = list(map(float, packed_value.split(',')))
+		else:
+			# should be array of strings
+			assert packed_value[0] == "'" and packed_value[-1] == "'"
+			value = packed_value[1:-2].split("','")
+		if using_index:
+			# need to modify list of items using _index values
+			index_values = list(map(int, packed_index_values.split(',')))
+			value = self.make_indexed_lists(value, index_values)
+		return (value, using_index)
+
+	def make_indexed_lists(self, tags, tags_index):
+		# build tags_lists - list of tags in array by ids
+		# tags - list of values, for example, "tags"
+		# tags_index - index array, indicates boundary of groupings for tags
+		tags_lists = []
+		cur_from = 0
+		for cur_to in tags_index:
+			if cur_to > cur_from:
+				tags_lists.append(tags[cur_from:cur_to])
+			else:
+				tags_lists.append([])
+			cur_from = cur_to
+		return tags_lists
+
+# end of class Cloc_info_manager:
+
+
+# def initialize_editoken(sc, qi):
+# 	# editoken needs to be refreshed for every new node searching
+# 	sc["editoken"] = qi["tokens"].copy()
+
+def make_like_pattern(sql_pattern):
+	# convert SQL like pattern (with "%" as wildcard) to regular expression pattern (with ".*" wildcard)
+	re_pattern = sql_pattern.replace("%", ".*")
+	# re_pattern = re_pattern.strip("\"'")
+	return re_pattern
+
+def like(pattern, text):
+	# implements LIKE operator.  pattern must be a regular expression, with "%" replaced by .*
+	if isinstance(text, bytes):
+		text = text.decode("utf-8")
+	match = re.fullmatch(pattern, text)
+	found_match = match is not None
+	return found_match
+
+def runsubquery(pi, cim, qr):
+	# Run subquery with current ploc_index pi, Cloc_info_manager (cim).
+	# Store search results in qr, which is a results.File_result object (see file results.py).
 	# return True if search results found, False otherwise
-	results = {}
-	sql_maker = make_sql.SQL_maker(qi)
-	# do normal query
-	sql = sql_maker.make_normal_sql(cpi)
-	do_query(sql, results, "vind")
-	sql = sql_maker.make_table_sql()
-	do_query(sql, results, "vrow")
-	if results:
-		qr[cpi] = results
-		return True
-	else:
-		return False
 
+	def check_node():
+		# check one node (parent) may be group or dataset.
+		# pi - parent index (ploc index, e.g. subquery index)
+		# subquery and node being checked in specified by state of cim
+		# qr - container for query results
+		nonlocal pi, cim, qr
+		children_info = cim.get_children_info()
+		if children_info is None:
+			# could not obtain all values for this node, only reason should be because subscripts don't match 
+			return
+		# editoken needs to be refreshed for every new node searching
+		editoken = cim.qi["tokens"].copy()
+		vi_res = results.Vind_result()	# for storing individual results
+		get_individual_values(editoken, vi_res)	# fills vi_res, edits editoken"]
+		vtbl_res = results.Vtbl_result()	# for storing row results
+		found = get_row_values(editoken, vtbl_res)
+		if found:
+			# found some results, save them
+			node_name = cim.get_node_name()
+			node_result = results.Node_result(node_name, vi_res, vtbl_res)
+			qr.add_node_result(node_result, pi)
 
-# def runsubquery_old(cpi, fp, qi, qr):
-# 	# run subquery with current ploc_index cpi and query information (qi)
-# 	# store search results in qr[cpi] (qr is a list, cpi is the index to each element)/
-# 	# qr[cpi] is also a list.  Each element is a dictionary with the following format:
-# 	# {"node": "/path/to/parent/node",
-# 	#  "vind": [
-# 	#            [cname1, val11, val12, val13, ...], [cname2, val21, val22, val23, ...] # cname - child name
-# 	#          ]
-# 	#  "vrow": [   # for values stored in tables, need to return rows
-# 	#			 [col1Name,  col2name,  col3name, ...]  # the headers
-# 	#			 [col1val1,  col2val1,  col3val1, ...]  # a tuple for each set of values found
-# 	#			 [col1val2,  col2val2,  col3val2, ...]
-# 	#          ]
-# 	# }
-# 	# return True if search results found, False otherwise
+	def get_individual_values(editoken, vi_res):
+		# Fills vi_res (a results.Vind_result object) with individual results; edits editoken.
+		# Finds values of individual variables (not part of table) satisifying search criteria
+		# to do that, for each individual variable, evals the binary expression, saving values that
+		# result in True.  Edit editoken replacing: var op const with True or False in
+		# preparation for eval done in get_row_values.
+		nonlocal cim
+		qi = cim.qi
+		cpi = cim.pi  # cpi == current ploc index
+		query_children = cim.get_query_children()
+		children_info = cim.get_children_info()
+		for i in range(len(query_children)):
+			child = query_children[i]
+			child_info = children_info[child]
+			if child_info["drow"]:
+				# skip values part of a table with rows
+				continue			
+			value = child_info["decoded_value"]
+			if i < len(qi["plocs"][cpi]["display_clocs"]): 
+				# just displaying these values, not part of expression.  Save it.  (display_clocs are first in children)
+				vi_res.add_vind_value(child, value)
+			else:
+				# child is part of expression.  Need to make string for eval to find values
+				# matching criteria, save matching values, and edit sc["editoken"]
+				tindx = qi["plocs"][cpi]["cloc_index"][i - len(qi["plocs"][cpi]["display_clocs"])]  # token index
+				if qi["ttypes"][tindx] != "CLOC":
+					node_name = cim.get_node_name()
+					sys.exit(("%s/%s, expected token CLOC, found token: %s value: %s"
+					" i=%i, tindx=%i, ttypes=%s, editoken=%s") % (node_name, child, qi["ttypes"][tindx],
+					editoken[tindx], i, tindx, qi["ttypes"], editoken))
+				if qi["tokens"][tindx+1] == "LIKE":
+					str_filt = "filter( (lambda x: like(%s, x)), value)" % make_like_pattern(qi["tokens"][tindx+2])
+				else:
+					str_filt = "filter( (lambda x: x %s %s), value)" % (qi["tokens"][tindx+1], qi["tokens"][tindx+2])
+				matching_values = list(eval(str_filt))
+				found_match = len(matching_values) > 0
+				if found_match:
+					# found values matching result, same them
+					vi_res.add_vind_value(child, matching_values)
+				# edit editoken for future eval.  Replace "cloc rop const" with "True" or "False"
+				editoken[tindx] = ""
+				editoken[tindx+1] = "%s" % found_match
+				editoken[tindx+2] = ""
 
-# 	def search_node(name, node):
-# 		# search one node, may be group or dataset
-# 		# name is ignored
-# 		# cpi - current ploc index, fp - h5py file pointer
-# 		# qi - query information, qr - container for query results
-# 		# sc search criteria
-# 		# must always return None to allow search (visititems) to continue
-# 		nonlocal sc, cpi, fp, qi, qr
-# 		if sc["match_path"] and not re.fullmatch(sc["match_path"], node.name):
-# 			# path does not pattern specified in query
-# 			return None
-# 		ctypes = []  # types of found children
-# 		for child in sc["children"]:
-# 			ctype = get_child_type(node, child)
-# 			if ctype is None:
-# 				# child not found, skip this node
-# 				return None
-# 			ctypes.append(ctype)
-# 		# found all the children, do search for values, store in query results (qre)
-# 		qre = {"vind": [], "vrow": []}
-# 		initialize_editoken(sc, qi)
-# 		get_individual_values(node, ctypes, qre)	# fills qre["vind"], edits sc["editoken"]
-# 		found = get_row_values(node, ctypes, qre)	# evals sc["editoken"], fills qre["vrow"]
-# 		if found:
-# 			# found some results, save them
-# 			qre["node"] = node.name
-# 			qr[cpi].append(qre)
-# 		return None
+	def get_row_values(editoken, vtbl_res):
+		# evals editoken, stores results in vtbl_res (a results.Vtbl_result object)
+		# Does search for rows within a table stored as datasets with aligned columns, some of which
+		# might have an associated index array.
+		# Does this by getting all values from the columns, using zip to create aligned tuples
+		# and making expression that can be run using eval, with filter function.
+		# Store found values in vtbl_res and return True if expression evaluates as True, otherwise
+		# False.
+		nonlocal cim
+		qi = cim.qi
+		cpi = cim.pi  # cpi == current ploc index
+		query_children = cim.get_query_children()
+		children_info = cim.get_children_info()
+		cvals = []   # for storing all the column values
+		cnames = []  # variable names associed with corresponding cval entry
+		made_by_index = []  # list of clocs with associated _index.  Has an array in cvals.
+		# made_by_index = []  # list of clocs with associated _index.  Has an array in cvals.
+		for i in range(len(query_children)):
+			child = query_children[i]
+			child_info = children_info[child]
+			if not child_info["drow"]:
+				# skip values not part of a table with rows
+				continue
+			# check to see if this child was referenced before
+			if child in cnames:
+				# child was referenced before, use previous index
+				val_idx = cnames.index(child)
+			else:
+				val_idx = len(cnames)
+				cnames.append(child)
+				value = child_info["decoded_value"]
+				if child_info["using_index"]:
+					made_by_index.append(child)
+				cvals.append(value)
+			# now have value and val_index associated with child. Edit expression if this child is in expression
+			if i >= len(qi["plocs"][cpi]["display_clocs"]):
+				# this appearence of child corresponds to an expression (display_clocs are first in children)
+				# need to edit tokens
+				node_name = cim.get_node_name()
+				cloc_idx = qi["plocs"][cpi]["cloc_index"][i - len(qi["plocs"][cpi]["display_clocs"])]
+				assert qi["ttypes"][cloc_idx] == "CLOC", "%s/%s token CLOC should be at location with cloc_idx" %(
+					node_name, child)
+				assert qi["ttypes"][cloc_idx+2] in ("SC", "NC"), ("%s/%s child should be compared to string or number,"
+					" found type '%i', value: '%s'" )% ( node_name, child, 
+					qi["ttypes"][cloc_idx+2], editoken[cloc_idx+2])
+				op = editoken[cloc_idx+1]
+				const = editoken[cloc_idx+2]
+				if child in made_by_index:
+					# values are arrays with number in each element indicated by _index arrays
+					# need to convert "child op const" to "in" or any(map( lambda y: y op const, x[i]))". Like this:
+					# str_filt3="filter( (   lambda x: any(map( lambda y: y == 6, x[2]))   ), zipl)"
+					if op == "LIKE":
+						opstr = "any(map(lambda y: like(%s, y), x[%i]))" % (make_like_pattern(const), val_idx)
+					elif op == "==":
+						opstr = "%s in x[%i]" % (const, val_idx)
+					else:
+						opstr = "any(map(lambda y: y %s %s, x[%i]))" % (op, const, val_idx)
+				else:
+					# not made by an index.  Generate comparisions with scalar values
+					if op == "LIKE":
+						opstr = "like(%s, x[%i])" % (make_like_pattern(const), val_idx)
+					else:
+						opstr = "x[%i] %s %s" % (val_idx, op, const)
+				# now opstr contains entire expression, save it, replacing original
+				editoken[cloc_idx] = ""
+				editoken[cloc_idx+1] = opstr
+				editoken[cloc_idx+2] = ""				
+		# Done with loop creating expression to evaluate
+		# perform evaluation
+		# replace "&" and "|" with and
+		sqr = qi["plocs"][cpi]["range"]  # subquery range
+		equery = [ "and" if x == "&" else "or" if x == "|" else x for x in editoken[sqr[0]:sqr[1]]]
+		equery = " ".join(equery)  # make it a single string
+		# print("equery is: %s" % equery)
+		if len(cvals) == 0:
+			# are no column values in this expression.  Just evaluate it
+			result = eval(equery)
+		else:
+			zipl = list(zip(*(cvals)))
+			# print("zipl = %s" % zipl)
+			str_filt = "filter( (lambda x: %s), zipl)" % equery
+			# print("str_filt=%s" % str_filt)
+			result = list(eval(str_filt))
+			if len(result) > 0:
+				vtbl_res.set_tbl_result(cnames, result)
+				result = True
+			else:
+				result = False
+		return result
 
-# 	def get_child_type(node, child):
-# 		# return type of child inside of node.
-# 		# Is one of following:
-# 		# None - not present
-# 		# Dictionary, with keys:
-# 		#    type - "attribute" - attribute, or "dataset" - dataset
-# 		#    If type attribute, has key drow == False (since not part of table with rows)
-# 		#    If type dataset, then also has keys:
-# 		#        drow - True if in table with rows (aligned columns), False otherwise
-# 		#        sstype - subscript type.  Either:
-# 		#           None (no subscript),
-# 		#           "compound" (column in compound dataset).
-# 		#           "2d" (column in 2-d dataset.  Index will be an integer, e.g. [1])
-# 		nonlocal sc, cpi, fp, qi, qr
-# 		if child in node.attrs:
-# 			return {"type": "attribute", "drow": False}
-# 		if not isinstance(node,h5py.Group):
-# 			# can't be dataset because parent is not a group
-# 			return None
-# 		if child in node and isinstance(node[child], h5py.Dataset):
-# 			# child is dataset inside a group; check for part of a table (drow = True)
-# 			drow = "colnames" in node.attrs and (child == "id" or 
-# 				child in [s.decode("utf-8").strip() for s in node.attrs["colnames"]])
-# 			sstype = False	# not subscript since full child name found
-# 			return {"type": "dataset", "sstype": None, "drow": drow}
-# 		if child not in qi["plocs"][cpi]["cloc_parts"]:
-# 			# no subscript, child not found
-# 			return None
-# 		# have subscript
-# 		(main, subscript) = qi["plocs"][cpi]["cloc_parts"][child]
-# 		if main in node and isinstance(node[main], h5py.Dataset):
-# 			if len(node[main].shape) == 2:
-# 				# found 2d table
-# 				if subscript.isdigit() and int(subscript) < node[main].shape[1]:
-# 					# found 2d table and index is valid (integer less than number of columns)
-# 					sstype = "2d"
-# 				else:
-# 					# found 2 table, but index is invalid (not integer or greater than number of cols)
-# 					return None
-# 			elif len(node[main].shape) ==1 and subscript in node[main].dtype.names:
-# 				# subscript is a name in a compound type.  e.g.:
-# 				# >>> ts.dtype.names
-# 				# ('idx_start', 'count', 'timeseries')
-# 				sstype = "compound"
-# 			else:
-# 				# subscript not part of this dataset
-# 				return None
-# 			# if made it here, have valid subscript.  Now determine if main is part of table (drow = True)
-# 			drow = "colnames" in node.attrs and (main == "id" or 
-# 				main in [s.decode("utf-8").strip() for s in node.attrs["colnames"]])
-# 			return {"type": "dataset", "sstype": sstype, "drow": drow}
-
-# 	def get_individual_values(node, ctypes, qre):
-# 		# fills qre["vind"], edits sc["editoken"]
-# 		# finds values of individual variables (not part of table) satisifying search criteria
-# 		# to do that, for each individual variable, evals the binary expression, saving values that
-# 		# result in True.  Edit sc["editoken"] replacing: var op const with True or False in
-# 		# perperation for eval done in get_row_values.
-# 		nonlocal sc, cpi, fp, qi
-# 		for i in range(len(sc["children"])):
-# 			ctype = ctypes[i]
-# 			if ctype["drow"]:
-# 				# skip values part of a table with rows
-# 				continue
-# 			child = sc["children"][i]
-# 			value = load_value(node, child, ctype)
-# 			if i < len(qi["plocs"][cpi]["display_clocs"]): 
-# 				# just displaying these values, not part of expression.  Save it.  (display_clocs are first in children)
-# 				qre["vind"].append([child, ] + value)
-# 			else:
-# 				# child is part of expression.  Need to make string for eval to find values
-# 				# matching criteria, save matching values, and edit sc["editoken"]
-# 				tindx = qi["plocs"][cpi]["cloc_index"][i - len(qi["plocs"][cpi]["display_clocs"])]  # token index
-# 				assert qi["ttypes"][tindx] == "CLOC", ("%s/%s, expected token CLOC, found token: %s value: %s"
-# 					" i=%i, tindx=%i, ttypes=%s, editoken=%s") % (node.name, child, qi["ttypes"][tindx],
-# 					sc["editoken"][tindx], i, tindx, qi["ttypes"], sc["editoken"])
-# 				if qi["tokens"][tindx+1] == "LIKE":
-# 					str_filt = "filter( (lambda x: like(%s, x)), value)" % make_like_pattern(qi["tokens"][tindx+2])
-# 				else:
-# 					str_filt = "filter( (lambda x: x %s %s), value)" % (qi["tokens"][tindx+1], qi["tokens"][tindx+2])
-# 				matching_values = list(eval(str_filt))
-# 				found_match = len(matching_values) > 0
-# 				if found_match:
-# 					# found values matching result, same them
-# 					qre["vind"].append([child, ] + matching_values)
-# 				# edit editoken for future eval.  Replace "cloc rop const" with "True" or "False"
-# 				sc["editoken"][tindx] = ""
-# 				sc["editoken"][tindx+1] = "%s" % found_match
-# 				sc["editoken"][tindx+2] = ""
-
-# 	def load_value(node, child, ctype):
-# 		# load value from hdf5 node.  child-name of child, ctype- type of child
-# 		nonlocal cpi, qi, fp
-# 		if ctype["type"] == "attribute":
-# 			value = node.attrs[child]
-# 		elif ctype["sstype"] is not None:
-# 			# value indicated by subscript (either 2d array column or compound datatype)
-# 			(main, subscript) = qi["plocs"][cpi]['cloc_parts' ][child]
-# 			if ctype["sstype"] == "2d":
-# 				# value is column in 2d table, extract column by h5py slice
-# 				value = node[main][:,int(subscript)]
-# 			else:
-# 				assert ctype["sstype"] == "compound", "unknown sstype found %s" % ctype["sstype"]
-# 				value = node[main][subscript]
-# 		else:
-# 			# no subscript, load value directly
-# 			value = node[child].value
-# 		# assert len(value) > 0, "Empty value found: %s, %s" % (node.name, child) 
-# 		value = convert_to_list(value)
-# 		if len(value) > 0 and isinstance(value[0], h5py.h5r.Reference):
-# 			# assume array of object references.  Convert to strings (names of objects)
-# 			value = [fp[n].name for n in value]
-# 		return value
-
-# 	def get_row_values(node, ctypes, qre):
-# 		# evals sc["editoken"], fills qre["vrow"]
-# 		# does search for rows within a table stored as datasets with aligned columns, some of which
-# 		# might have an associated index array.
-# 		# Does this by getting all values from the columns, using zip to create aligned tuples
-# 		# and making expression that can be run using eval, with filter function.
-# 		# Store found values in qre["vrow"] and return True if expression evaluates as True, otherwise
-# 		# False.
-# 		nonlocal sc, cpi, fp, qi
-# 		cvals = []   # for storing all the column values
-# 		cnames = []  # variable names associed with corresponding cval entry
-# 		made_by_index = []  # list of clocs with associated _index.  Has an array in cvals.
-# 		for i in range(len(sc["children"])):
-# 			ctype = ctypes[i]
-# 			if not ctype["drow"]:
-# 				# skip values not part of a table with rows
-# 				continue
-# 			child = sc["children"][i]
-# 			# check to see if this child was referenced before
-# 			if child in cnames:
-# 				# child was referenced before, use previous index
-# 				val_idx = cnames.index(child)
-# 			else:
-# 				val_idx = len(cnames)
-# 				cnames.append(child)
-# 				value = load_value(node, child, ctype)
-# 				# check for _index dataset.  main is either child name, or part without subscript
-# 				main = child if ctype["sstype"] is None else qi["plocs"][cpi]['cloc_parts' ][child][0]
-# 				child_index = main + "_index"
-# 				if child_index in node:
-# 					if not isinstance(node[child_index], h5py.Dataset):
-# 						sys.exit("Node %s is not a Dataset, should be since has '_index' suffix" % child_index);
-# 					index_vals = node[child_index].value;
-# 					value = make_indexed_lists(value, index_vals)
-# 					# print("child=%s, after indexed vals=%s" % (child, value))
-# 					made_by_index.append(child)
-# 				cvals.append(value)
-# 			# now have value and val_index associated with child. Edit expression if this child is in expression
-# 			if i >= len(qi["plocs"][cpi]["display_clocs"]):
-# 				# this appearence of child corresponds to an expression (display_clocs are first in children)
-# 				# need to edit tokens
-# 				cloc_idx = qi["plocs"][cpi]["cloc_index"][i - len(qi["plocs"][cpi]["display_clocs"])]
-# 				assert qi["ttypes"][cloc_idx] == "CLOC", "%s/%s token CLOC should be at location with cloc_idx" %(
-# 					node.name, child)
-# 				assert qi["ttypes"][cloc_idx+2] in ("SC", "NC"), ("%s/%s child should be compared to string or number,"
-# 					" found type '%i', value: '%s'" )% ( node.name, child, 
-# 					qi["ttypes"][cloc_idx+2], sc["editoken"][cloc_idx+2])
-# 				op = sc["editoken"][cloc_idx+1]
-# 				const = sc["editoken"][cloc_idx+2]
-# 				if child in made_by_index:
-# 					# values are arrays with number in each element indicated by _index arrays
-# 					# need to convert "child op const" to "in" or any(map( lambda y: y op const, x[i]))". Like this:
-# 					# str_filt3="filter( (   lambda x: any(map( lambda y: y == 6, x[2]))   ), zipl)"
-# 					if op == "LIKE":
-# 						opstr = "any(map(lambda y: like(%s, y), x[%i]))" % (make_like_pattern(const), val_idx)
-# 					elif op == "==":
-# 						opstr = "%s in x[%i]" % (const, val_idx)
-# 					else:
-# 						opstr = "any(map(lambda y: y %s %s, x[%i]))" % (op, const, val_idx)
-# 				else:
-# 					# not made by an index.  Generate comparisions with scalar values
-# 					if op == "LIKE":
-# 						opstr = "like(%s, x[%i])" % (make_like_pattern(const), val_idx)
-# 					else:
-# 						opstr = "x[%i] %s %s" % (val_idx, op, const)
-# 				# now opstr contains entire expression, save it, replacing original
-# 				sc["editoken"][cloc_idx] = ""
-# 				sc["editoken"][cloc_idx+1] = opstr
-# 				sc["editoken"][cloc_idx+2] = ""				
-# 		# Done with loop creating expression to evaluate
-# 		# perform evaluation
-# 		# replace "&" and "|" with and
-# 		sqr = qi["plocs"][cpi]["range"]  # subquery range
-# 		equery = [ "and" if x == "&" else "or" if x == "|" else x for x in sc["editoken"][sqr[0]:sqr[1]]]
-# 		equery = " ".join(equery)  # make it a single string
-# 		# print("equery is: %s" % equery)
-# 		if len(cvals) == 0:
-# 			# are no column values in this expression.  Just evaluate it
-# 			result = eval(equery)
-# 		else:
-# 			zipl = list(zip(*(cvals)))
-# 			# print("zipl = %s" % zipl)
-# 			str_filt = "filter( (lambda x: %s), zipl)" % equery
-# 			# print("str_filt=%s" % str_filt)
-# 			result = list(eval(str_filt))
-# 			if len(result) > 0:
-# 				qre["vrow"].append([cnames, ] + result)
-# 				result = True
-# 			else:
-# 				result = False
-# 		return result
-
-# 	# start of main body of runsubqeury
-# 	sc = get_search_criteria(cpi, qi)
-# 	# print("sc = %s" % sc)
-# 	if sc['start_path'] not in fp:
-# 		# did not even find starting path in hdf5 file, cannot do search
-# 		return False
-# 	start_node = fp[sc['start_path']]
-# 	search_node(None, start_node)
-# 	if sc['search_all'] and isinstance(start_node,h5py.Group):
-# 		start_node.visititems(search_node)
-# 	# qr[cpi] = "cpi=%i, ploc=%s, sc=%s" % (cpi, qi["plocs"][cpi]["path"], sc)
-# 	found = len(qr[cpi]) > 0  # will have content if result found
-# 	return found
-
-
-# def get_search_criteria(cpi, qi):
-# 	# get sc (search_criteria) for finding hdf5 group or dataset to perform search
-# 	# sc = {
-# 	#  start_path - path to starting element to search.  This is specified by parent in query
-# 	#  match_path - regular expression for path that must match parent to do search.  Also
-# 	#               specified by parent in query.  May be different than start_path if 
-# 	#               wildcards are in parent.  Is None if search_all is False
-# 	#  search_all - True if searching all children of start_path.  False if searching just within
-# 	#               start_path
-# 	#  children   - list of children (attributes or datasets) that must be present to find a match
-# 	#  editoken   - tokens making up subquery, which will be "edited" to perform query.
-# 	#               Initially is copy of tokens
-# 	# }
-# 	ploc = qi["plocs"][cpi]["path"]
-# 	idx_first_star = ploc.find("*")
-# 	if idx_first_star > -1:
-# 		# at least one star (wild card)
-# 		start_path = ploc[0:idx_first_star]
-# 		if not start_path:
-# 			start_path = "/"
-# 		search_all = True   # search all if wildcard character in parent location
-# 		match_path = ploc.replace("*", ".*")  # replace * with *. for RE match later
-# 	else:
-# 		start_path = ploc
-# 		match_path = None
-# 		search_all = False
-# 	# make list of children
-# 	children = qi["plocs"][cpi]["display_clocs"].copy()
-# 	for i in qi["plocs"][cpi]["cloc_index"]:
-# 		children.append(qi["tokens"][i])
-# 	sc = {"start_path": start_path, "match_path": match_path,
-# 		"search_all": search_all, "children": children}
-# 	return sc
-
-
-
-
-
-
-
-
-
-
+	# start of main body of runsubqeury
+	# children = get_list_of_children(cpi, qi)
+	# loop through each node in fqr
+	cim.set_ploc_index(pi)
+	num_nodes = cim.get_number_of_nodes()
+	for node_index in range(num_nodes):
+		cim.set_node_index(node_index)
+		check_node()
+	found = qr.get_subquery_length(pi) > 0	# will have length > 1 if result found
+	return found
 
 def make_subquery_call_string(qi):
 	# build expression that calls runsubquery for each subquery
@@ -457,26 +476,35 @@ def make_subquery_call_string(qi):
 			i += 1
 		else:
 			# this token is start of expression for subquery, replace by call
-			cs_tokens.append("runsubquery(%i,qi,qr)" % cpi)
+			cs_tokens.append("runsubquery(%i,cim,qr)" % cpi)
 			i = qi['plocs'][cpi]["range"][1]  # advance to end (skiping all tokens in subquery)
 			cpi += 1
 	return " ".join(cs_tokens)
 
-def display_result(qr):
-	print("results are:")
-	# print("file %s:" % path)
-	pp.pprint(qr)
-
-def eval_subqueries(qi):
-	# start of evaluation of subqueries
-	# for storing query results
-	qr = [[] for i in range(len(qi["plocs"]))]
+def perform_query(qi):
+	# Execute the query
+	compiled_query_results = results.Results()
+	# following creates cim.sqr - subquery results which stores result of each SQL subquery
+	# this is used by runsubquery to determin the final (merged) results
+	cim = Cloc_info_manager(qi)
+	# now have results of SQL queries on database stored in sqr
+	# use that to determin result of overall query (by combining results of subqueries)
 	subquery_call_string = make_subquery_call_string(qi)
 	# print("%s" % subquery_call_string)
-	# will be like: runsubquery(0,fp,qi,qr) & runsubquery(1,fp,qi,qr)
-	result = eval(subquery_call_string)
-	if result:
-	 	display_result(qr)
+	# will be like: runsubquery(0,cim,qr) & runsubquery(1,cim,qr)
+	for file_id in cim.get_file_ids():
+		# specify which file to Cloc_info_manager
+		cim.set_file_id(file_id)
+		file_name = cim.get_file_name()
+		# initialize File_result object for storing subquery results	
+		qr = results.File_result(file_name, len(qi["plocs"]))
+		result = eval(subquery_call_string)
+		if result:
+			compiled_query_results.add_file_result(qr)
+	num_files_matching = compiled_query_results.get_num_files()
+	print("Found %i matching files:" % num_files_matching)
+	if num_files_matching > 0:
+		pp.pprint( compiled_query_results.get_value() )
 
 def do_interactive_queries():
 	show_available_files()
@@ -487,7 +515,7 @@ def do_interactive_queries():
 		except EOFError:
 			break;
 		qi = parse2.parse(query)
-		eval_subqueries(qi)
+		perform_query(qi)
 	print("\nDone running all queries")
 
 def process_command_line(query):
@@ -496,7 +524,7 @@ def process_command_line(query):
 		do_interactive_queries()
 	else:
 		qi = parse2.parse(query)
-		eval_subqueries(qi)
+		perform_query(qi)
 
 def main():
 	global default_dbname, con

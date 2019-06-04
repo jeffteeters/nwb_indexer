@@ -98,7 +98,10 @@ class Vtbl_result:
 		self.row_values = row_values
 
 	def get_value(self):
-		value = {"child_names": self.child_names, "row_values": self.row_values}
+		if self.child_names is not None:
+			value = {"child_names": self.child_names, "row_values": self.row_values}
+		else:
+			value = {}
 		return value
 
 
