@@ -25,7 +25,7 @@ where:
 `<directory>` is a directory containing nwb files (extension ".nwb).
 
 This should scan all the nwb files in the directory and save the
-information about the small datasets and attributes in an SQLite3 database.
+information about the small datasets and attributes in a SQLite3 database.
 Name of the database file will be "nwb_index.db".  The program can be
 run multiple times with different directories to index additional
 NWB files.
@@ -40,13 +40,13 @@ Queries can be run by running:
 `<index_file>` = path to sqlite3 database file created in step 1 or '-' for the default database (nwb_index.db)
 
 `<query>` = query to execute (optional).  If present, must be quoted.  If not present, interactive mode is used
-which allows entering multiple queries.
+which allows entering multiple queries interactively.
 
 
-Queries are entered using the format described in the NWB Query Engine paper except:
-* Any wildcards (*) in the parent location must be specified otherwise an absolute location is assumed.
+Queries are specified using the format described in the NWB Query Engine paper, with the following possible exceptions:
+* Wildcards (*) in the parent location must be specified explicitly, otherwise an absolute location is assumed.
 * Values to be displayed can be specified by a list of child names separated by comma's before the expression.
-* String constants must always be enclosed in either single or doulble quotes.
+* String constants must always be enclosed in either single or doulble quotes.  (I think, need to test both single and double quotes).
 * Any string constant used with LIKE must have wildcards ("%" or "_") explicitly included (if no wildcards are included, the query does an exact match).
 * There must be an expression on the right with a relational operator.  Just giving the child location (e.g. `epochs:(start_time)`) is currently not allowed.
 
@@ -128,7 +128,7 @@ search_nwb.py <path> [ <query> ]
  <query> = query to execute (optional).  If present, must be quoted.
 ```
 
-#### Example query (NWB 1.0x files):
+#### Example query (NWB 1.x files):
 
 `time python search_nwb.py ../sample_data/ '/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 150'`
 
@@ -207,7 +207,7 @@ sys								    0m0.208s
 
 
 
-## Old documentation below, not updated. Queries may work, but output will be different.
+## Old documentation below, not updated. Queries may work, but output format will be different.
 
 
 `/:session_start_time LIKE "%Jun __ 2013%"`
