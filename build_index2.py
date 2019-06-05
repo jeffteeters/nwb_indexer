@@ -5,10 +5,31 @@ import sqlite3
 import numpy as np
 import math
 
-dbname="nwb_idx2.db"
+# global variables
+dbname="nwb_idx2.db"  # default database name
 con = None     # database connection
-file_id = None # id of current file (row inf h5file table)
-cur = None       # cursor
+cur = None     # database cursor
+file_id = None # id of current file (id of row in sqlite2 "file" table)
+
+# global constants used to control what is indexed
+
+# maximum length of single string
+MAX_STRING_LENGTH = 3000
+
+# maximum length (number elements) of string array not part of NWB 2 table
+MAX_STRING_ARRAY_LENGTH = 20
+
+# maximum length of packed string array, not part of NWB 2 table
+MAX_PACKED_STRING_LENGTH = 3000
+
+# maximum length of packed string array, not part of NWB 2 table
+MAX_NWB2_TABLE_SIZE = 10000		# maxium total size (number of elements) in dataset in NWB 2 table
+
+# maximum length of packed string array, that is part of NWB 2 table
+MAX_NWB2_PACKED_STRING_LENGTH = 10000
+
+# maximum number of columns in a 2-d dataset or in a compound dataset in a NWB 2 table
+MAX_NWB2_TABLE_NUMBER_OF_COLUMNS = 20
 
 
 # sqlite3 database schema
@@ -45,12 +66,13 @@ create table node (  -- stores groups, dataseta AND attributes
 
 create table value (			-- value of dataset or attribute
 	id integer primary key,
-	type char(1) not null CHECK( type IN ('n','s','N', 'S', 'c','M') ),
-		-- either: n-number, s-string, N-number array, S-string array, c-compound or 2-d
-		-- M - string array part of table (type 'N' and 'c' also part of table)
+	type char(1) not null CHECK( type IN ('i', 'f','s','I', 'F', 'S', 'c','M') ),
+		-- either: i-integer, f-float, s-string, I-integer array, F-float array,
+		--		S-string array, c-compound or 2-d
+		-- M - string array part of table (type 'I', 'F' and 'c' also part of table)
 	-- compound_cols text,		-- comma seperated list of columns names if compound type, otherwise NULL
-	nval real,					-- contains value of number, if type 'n'.  Otherwise, NULL
-	sval text					-- stores values of type s, N, S, c as comma seperated values otherwise NULL
+	nval numeric,				-- contains value of number, if type 'i' or 'f'.  Otherwise, NULL
+	sval text					-- stores values of type s, I, F, S, c as comma seperated values otherwise NULL
 		-- if type 'c', has list of columns names first, then lists of column values, lists seperated by ';'
 );
 
@@ -89,45 +111,6 @@ class Cache:
       key, value = row
       self.map[value] = key  # save indicator that record is already in database
 
-  # def save_map(self):
-  #   # saves map in the database
-  #   global con, cur
-  #   # execute insert statements
-  #   print("saving %s, %i rows" % (self.table_name, len(self.map) ))
-  #   for key, vt in sorted(self.map.items(), key = lambda kv:(kv[0], kv[1])):
-  #     # print("%i, %s" % (vt[0], key))
-  #     if vt[1] == 'new':  # only save new records
-  #       cur.execute("insert into %s (id, %s) values (?, ?)" % (self.table_name, self.value_name), (vt[0], key))
-
-# class Prenom_cache:
-# 	# cache values for prenom to allow quick lookup of prenom_id
-# 	# used for prenom and string table
-# 	def __init__(self):
-# 		# maps values to id
-# 		self.cache = {}
-# 		self.load_cache()
-
-# 	def get_id(self, pname):
-# 		global cur
-# 		# get id corresponding to value (which must be a string). Will add value to map if not present
-# 		assert isinstance(pname, str)
-# 		if pname in self.cache:
-# 			pid = self.cache[pname]  # prenom id, 'p' stands for prenome
-# 		else:
-# 			pid = len(self.cache) + 1
-# 			self.cache[pname] = pid  # save indicator if record is new
-# 			cur.execute("insert into prenom (id, name) values (?, ?)", (pid, pname))
-# 		return pid
-
-# 	def load_cache(self):
-# 		# load prenom values from table.  Needed if updating database
-# 		global cur
-# 		assert len(self.cache) == 0, "Prenom_cache load_cache called, but cache not empty"
-# 		result = cur.execute("select id, name from prenom order by id")
-# 		for row in result:
-# 			pid, pname = row
-# 			self.cache[pname] = pid
-
 class Value_mirror:
 	# used for quick lookups of values in value table when building index
 	def __init__(self):
@@ -146,7 +129,7 @@ class Value_mirror:
 			vid, vtype, nval, sval = row
 			self.mirror.append( (vid, vtype, nval, sval) )
 			assert vid == len(self.mirror), "column id in table value expected to be sequential, but is not"
-			if vtype == 'n':
+			if vtype == 'i' or vtype == 'f':
 				self.nval2id[nval] = vid
 			else:
 				assert isinstance(sval, str), "Should have str type sval if type not 'n'"
@@ -157,19 +140,17 @@ class Value_mirror:
 
 	def get_id(self, vtype, nval, sval):
 		global cur
-		assert vtype in ('n', 'N', 's', 'S', 'c', 'M'), 'value vtype invalid: "%s"' % vtype
-		if vtype == 'n':
-			assert (isinstance(nval, int) or isinstance(nval, float) or nval == "nan") and sval is None, (
-				"value type 'n' not consistent, nval=%s, type=%s, sval=%s, type=%s" %
+		assert vtype in ('i', 'f', 'I', 'F', 's', 'S', 'c', 'M'), 'value vtype invalid: "%s"' % vtype
+		if vtype == 'i':
+			assert (isinstance(nval, int) or nval == "nan") and sval is None, (
+				"value type 'i' not consistent, nval=%s, type=%s, sval=%s, type=%s" %
 				(nval, type(nval),sval, type(sval)))
-			if nval in self.nval2id:
-				vid = self.nval2id[nval]
-			else:
-				vid = len(self.mirror) + 1
-				self.mirror.append ( (vid, vtype, nval, sval) )
-				self.nval2id[nval] = vid
-				cur.execute("insert into value (id, type, nval, sval) values (?, ?, ?, ?)" , (
-					vid, vtype, nval, sval) )
+			vid = self.get_numeric_id(nval, vtype)
+		elif vtype == 'f':
+			assert (isinstance(nval, float) or nval == "nan") and sval is None, (
+				"value type 'f' not consistent, nval=%s, type=%s, sval=%s, type=%s" %
+				(nval, type(nval),sval, type(sval)))
+			vid = self.get_numeric_id(nval, vtype)
 		else:
 			assert isinstance(sval, str) and nval is None, ( 
 				"value type 's' not consisitent, sval='%s', type=%s, nval=%s" % (sval, type(sval), nval))
@@ -188,6 +169,20 @@ class Value_mirror:
 					vid, vtype, nval, sval) )
 				self.sval2id[key] = vid
 		return vid
+
+	def get_numeric_id(self, nval, vtype):
+		# private method used by get_id
+		if nval in self.nval2id:
+			vid = self.nval2id[nval]
+		else:
+			sval = None
+			vid = len(self.mirror) + 1
+			self.mirror.append ( (vid, vtype, nval, sval) )
+			self.nval2id[nval] = vid
+			cur.execute("insert into value (id, type, nval, sval) values (?, ?, ?, ?)" , (
+				vid, vtype, nval, sval) )
+		return vid
+
 
 # save id's (node.id) of groups that have the column names attribute.  This used to determine if values
 # should be saved, for NWB 2.x tables with aligned columns or compound tables.
@@ -268,9 +263,6 @@ def save_group(node, parent_id):
 		groups_with_colnames_attribute[group_id] = [ v.decode("utf-8") for v in value]
 	# save attributes
 	save_node_attributes(node, group_id)
-	# for key in node.attrs:
-	# 	value = node.attrs[key]
-	# 	save_attribute(group_id, key, value, node.name + "-" + key)
 	return group_id
 
 def save_node_attributes(node, node_id):
@@ -293,9 +285,6 @@ def save_dataset(node, parent_id, parent_node):
 	dataset_id = cur.lastrowid
 	# save attributes
 	save_node_attributes(node, dataset_id)
-	# for key in node.attrs:
-	# 	value = node.attrs[key]
-	# 	save_attribute(dataset_id, key, value, node.name + "-" + key)
 	return dataset_id
 
 def save_attribute(parent_id, key, value, attribute_path):
@@ -328,13 +317,14 @@ def get_node_id(node, parent_id, parent_node):
 
 def get_value_id_from_attribute(value, attribute_path):
 	global fp, value_mirror
+	global MAX_STRING_ARRAY_LENGTH
 	if isinstance(value, np.ndarray):
 		if len(value.shape) > 1:
 			# don't save multidimensional arrays
 			return None
 		if len(value) == 0:
 			return None	# don't save zero length values
-		if np.issubdtype(value.dtype, np.number):
+		if np.issubdtype(value.dtype, np.number) or np.issubdtype(value.dtype, np.dtype(bool).type):
 			if len(value) > 1:
 				# don't save values of numeric arrays, only scalars
 				return None
@@ -342,7 +332,11 @@ def get_value_id_from_attribute(value, attribute_path):
 			if math.isnan(nval):
 				nval="nan"
 			sval = None
-			vtype = 'n'
+			assert (np.issubdtype(value.dtype, np.integer)
+				or np.issubdtype(value.dtype, np.dtype(bool).type)
+				or np.issubdtype(value.dtype, np.float)), (
+				"type is: %s" % value.dtype)
+			vtype = 'f' if isinstance(value.dtype, np.float) else 'i'
 		elif np.issubdtype(value.dtype, np.character):
 			# found array of strings
 			assert isinstance(value[0], bytes), "expecting string value bytes, found %s (%s) at %s " % (
@@ -352,7 +346,10 @@ def get_value_id_from_attribute(value, attribute_path):
 				sval = value[0].decode("utf-8")
 				vtype = 's'	# single string
 			else:
-				if len(value) > 20:
+				if len(value) > MAX_STRING_ARRAY_LENGTH:
+					print("Warning, not saving string in attribute because it is longer " 
+						"than %i elements: %s (length = %i)" % (MAX_STRING_ARRAY_LENGTH, attribute_path,
+							len(value)))
 					# don't save string arrays longer than 20 elements
 					return None
 				sval = (b"'" + b"','".join(value) + b"'").decode("utf-8")	# join bytes, seperate by ','
@@ -384,8 +381,13 @@ def get_value_id_from_attribute(value, attribute_path):
 			nval = value.item()	# get numeric value
 			if math.isnan(nval):
 				nval="nan"
+			else:
+				assert (np.issubdtype(value.dtype, np.integer) or
+					np.issubdtype(value.dtype, np.floating)), "value.dtype is %s" % value.dtype
+				# was using np.dtype(float).type
+			vtype = 'i' if np.issubdtype(value.dtype, np.integer) else 'f'
 			sval = None
-			vtype = 'n'
+			# vtype = 'n'
 		else:
 			print("unknown generic type %s, value=%s at %s" % (type(value), value, attribute_path))
 			import pdb; pdb.set_trace()
@@ -397,7 +399,7 @@ def get_value_id_from_attribute(value, attribute_path):
 		if isinstance(sval, bytes):
 			sval = sval.decode("utf-8")
 	elif isinstance(value, (int, float)):
-		vtype = "n"	# s - single string
+		vtype = "i"	if isinstance(value, int) else 'f'
 		sval = None
 		nval = value
 		if math.isnan(nval):
@@ -414,8 +416,11 @@ def get_value_id_from_attribute(value, attribute_path):
 	value_id = value_mirror.get_id(vtype, nval, sval)
 	return value_id
 
+
 def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 	global fp, value_mirror, groups_with_colnames_attribute
+	global MAX_STRING_LENGTH, MAX_STRING_ARRAY_LENGTH, MAX_PACKED_STRING_LENGTH
+	global MAX_NWB2_TABLE_SIZE, MAX_NWB2_PACKED_STRING_LENGTH, MAX_NWB2_TABLE_NUMBER_OF_COLUMNS
 	if node.size == 0:
 		# don't save anything if dataset is empty or too large
 		return None
@@ -436,57 +441,78 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			index_dataset = parent_node[index_name]
 			assert np.issubdtype(index_dataset.dtype, np.integer), "_index dataset is not integer (%s): %s" % (
 				index_dataset.dtype, index_dataset.name)
+			assert len(index_dataset.shape) == 1, "_index dataset should be 1-d: %s" % index_dataset.name
 			# create string for storing index values, separated from other values by ';i;'
-			index_values = ";i;" + format_column(index_dataset.value, index_dataset)
+			index_values = ";i;" + ",".join(["%i" % x for x in index_dataset.value])
 		else:
 			index_values = ""
-		# done getting _index values (if present), not get value for node
+		# done getting _index values (if present), now get value for node
 		if len(node.shape) > 1:
 			# found dataset with more than one dimension
-			if (node.size > 10000 or len(node.shape) > 2 or node.shape[1] > 10):
-				# don't store values of multidimensional arrays unless in table group
-				# also, don't store if too big, e.g. image mask table
-				# or if is more then 2 dimensions or if more than 10 columns (arbituary cutoff)
+			if (node.size > MAX_NWB2_TABLE_SIZE or len(node.shape) > 2
+				or node.shape[1] > MAX_NWB2_TABLE_NUMBER_OF_COLUMNS):
+				# Don't store if too big, e.g. image mask table
+				# or if is more then 2 dimensions or if too many columns
 				return None
-			# todo - indicate type of data in columns
-			colnames = ','.join([ "%i" % i for i in range(node.shape[1]) ])
-			coldata = ';'.join(format_column(node[:,i], node) for i in range(node.shape[1]))
-			sval = colnames + '%' + coldata + index_values
+			# have 2-d array, all elements of same type.  Append type code to each column name anyway
+			colnames = []
+			coldata = []
+			in_table = True
+			for i in range(node.shape[1]):
+				fmt, type_code = format_column(node[:,i], node, in_table)
+				colnames.append("%i%s" % (i, type_code))
+				coldata.append(fmt)
+			sval = ','.join(colnames) + "%" + ';'.join(coldata) + index_values
+			# colnames = ','.join([ "%i" % i for i in range(node.shape[1]) ])
+			# coldata = ';'.join(format_column(node[:,i], node) for i in range(node.shape[1]))
+			# sval = colnames + '%' + coldata + index_values
 			nval = None
 			vtype = 'c'
 		elif len(node.dtype) > 1:
 			# found compound type
-			if node.size * len(node.dtype) > 10000:
-				print('Warning: not indexing compound type because too big, at %s' % node.name)
+			if node.size * len(node.dtype) > MAX_NWB2_TABLE_SIZE:
+				print('Warning: not indexing compound type because too big (size=%i, limit=%i), at %s'
+					% (node.size * len(node.dtype), MAX_NWB2_TABLE_SIZE, node.name))
 				# don't save compound type if is too big
 				return None
-			colnames = ','.join(node.dtype.names)
-			coldata = ';'.join(format_column(node[cn], node) for cn in node.dtype.names)
-			sval = colnames + '%' + coldata + index_values
+			colnames = []
+			coldata = []
+			in_table = True
+			for cn in node.dtype.names:
+				fmt, type_code = format_column(node[cn], node, in_table)
+				colnames.append("%s%s" % (cn, type_code))
+				coldata.append(fmt)
+			sval = ','.join(colnames) + "%" + ';'.join(coldata) + index_values
+			# colnames = ','.join(node.dtype.names)
+			# coldata = ';'.join(format_column(node[cn], node) for cn in node.dtype.names)
+			# sval = colnames + '%' + coldata + index_values
 			nval = None
 			vtype = 'c'
 		elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
 			# found numeric dataset
-			if node.size > 10000:
+			if node.size > MAX_NWB2_TABLE_SIZE:
 				# don't save if larger than a threshold
-				print('Warning: not indexing numeric array because too large, at %s' % node.name)
+				print('Warning: not indexing numeric array because too big (size=%i, limit=%i), at %s' %
+				 (node.size, MAX_NWB2_TABLE_SIZE, node.name))
 				return None
-			vtype = "N"	# N - array of numbers
+			vtype = "I" if (np.issubdtype(node.dtype, np.integer) or
+				 np.issubdtype(node.dtype, np.dtype(bool).type)) else "F"
+			# vtype = "N"	# N - array of numbers
 			nval =  None
 			sval = ','.join([ "%g" % n for n in node.value ]) + index_values
 		elif np.issubdtype(node.dtype, np.character) or isinstance(node[0], h5py.Reference):
 			# found string dataset or object references (replaced by path to node)
-			sval = format_column(node.value, node) + index_values
-			if len(sval) > 10000:
-				print('Warning: not indexing string array because too large, at %s' % node.name)
+			sval = format_column(node.value, node)[0] + index_values
+			if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
+				print("Warning: not indexing string array because too large "
+					"(packed size = %i, limit = %i), at '%s'" % (len(sval),
+						MAX_NWB2_PACKED_STRING_LENGTH, node.name))
 				return None	
 			nval = None
 			vtype = "M"
 		else:
 			vlenType = h5py.check_dtype(vlen=node.dtype)
 			if vlenType in (bytes, str):
-				if node.len() > 20:
-					return None
 				vlist = node.value.tolist()
 				if isinstance(vlist[0], bytes):
 					sval = b"'" + b"','".join(vlist) + b"'"	# join bytes
@@ -494,7 +520,10 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				else:
 					sval = "'" + "','".join(vlist) + "'"	# join string
 				nval = None
-				if len(sval) > 3000:
+				if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
+					print("Warning: not indexing vlen string array because too large "
+					"(packed size = %i, limit = %i), at '%s'" % (len(sval),
+						MAX_NWB2_PACKED_STRING_LENGTH, node.name))
 					# don't save if total length of string longer than a specific length
 					return None
 				sval += index_values	# append index_values if present
@@ -508,8 +537,12 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 	elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
 		# found numeric dataset
 		if node.size == 1:
-			vtype = "n"	# n - single number
-			nval = float(node[()]) if scalar else float(node.value[0])
+			if np.issubdtype(node.dtype, np.integer) or np.issubdtype(node.dtype, np.dtype(bool).type):
+				nval = int(node[()]) if scalar else int(node.value[0])
+				vtype = "i"
+			else:
+				nval = float(node[()]) if scalar else float(node.value[0])
+				vtype = "f"
 			if math.isnan(nval):
 				nval="nan"
 			sval = None
@@ -519,14 +552,14 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 		# found string dataset
 		if scalar:
 			sval = node[()]
-			if len(sval) > 3000:
+			if len(sval) > MAX_STRING_LENGTH:
 				# don't save strings longer than a specific length
 				return None
 			if isinstance(sval, bytes):
 				sval = sval.decode("utf-8")  # store as string, not bytes
 			nval = None
 			vtype = "s"
-		elif node.len() > 20:
+		elif node.len() > MAX_STRING_ARRAY_LENGTH:
 			# don't save if more than 20 elements in string array
 			return None
 		else:
@@ -536,7 +569,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				sval = sval.decode("utf-8")
 			else:
 				sval = "'" + "','".join(vlist) + "'"	# join string
-			if len(sval) > 3000:
+			if len(sval) > MAX_PACKED_STRING_LENGTH:
 				# don't save if total length of string longer than a specific length
 				return None
 			nval = None
@@ -550,12 +583,12 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				sval = node[()]
 				if isinstance(sval, bytes):
 					sval = sval.decode("utf-8")  # store as string, not bytes
-				if len(sval) > 3000:
+				if len(sval) > MAX_STRING_LENGTH:
 					return None
 				vtype = "s"	# s - single (scalar) string
 				nval = None
 			else:
-				if node.len() > 20:
+				if node.len() > MAX_STRING_ARRAY_LENGTH:
 					return None
 				vlist = node.value.tolist()
 				if isinstance(vlist[0], bytes):
@@ -564,7 +597,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				else:
 					sval = "'" + "','".join(vlist) + "'"	# join string
 				nval = None
-				if len(sval) > 3000:
+				if len(sval) > MAX_PACKED_STRING_LENGTH:
 					# don't save if total length of string longer than a specific length
 					return None
 				nval = None
@@ -580,6 +613,9 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			value = [fp[n].name for n in node.value]
 			if len(value) > 1:
 				sval = "'" + "','".join(value) + "'"
+				if len(sval) > MAX_PACKED_STRING_LENGTH:
+					# don't save if total length of string longer than a specific length
+					return None
 				vtype = "S"
 			else:
 				sval = value[0]
@@ -592,23 +628,36 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 	value_id = value_mirror.get_id(vtype, nval, sval)
 	return value_id
 
-def format_column(col, node):
+def format_column(col, node, in_table=False):
 	# format an 1-d array of values as a comma separated string
+	# return a tuple of type_code and formatted column
+	# in_table is True if column is in a NWB 2 table, False otherwise
 	global fp
 	assert len(col) > 0, "attempt to format empty column at %s" % node.name
 	if isinstance(col[0], bytes):
 		fmt = (b"'" + b"','".join(col) + b"'").decode("utf-8")
+		type_code = "M" if in_table else "S"
 	elif isinstance(col[0], str):
 		fmt = "'" + "','".join(col) + "'"
-	elif isinstance(col[0], (int, float)):
+		type_code = "M" if in_table else "S"
+	elif isinstance(col[0], (int, np.integer)):
 		fmt = ",".join(["%g" % x for x in col])
-	elif isinstance(col[0], np.number):
-		fmt = ",".join(["%g" % x.item() for x in col])  # convert to python type
+		type_code = 'I'
+	elif isinstance(col[0], (float, np.float)):
+		fmt = ",".join(["%g" % x for x in col])
+		type_code = 'F'
 	elif isinstance(col[0], h5py.h5r.Reference):
 		fmt = "'" + "','".join([fp[x].name for x in col]) + "'"  # convert reference to name of target
+		type_code = ""
+	elif np.issubdtype(col.dtype, np.integer) or np.issubdtype(col.dtype, np.floating):
+	# elif isinstance(col[0], np.number):
+		fmt = ",".join(["%g" % x.item() for x in col])  # convert to python type
+		type_code = "I" if  np.issubdtype(col.dtype, np.integer) else "F"
 	else:
-		sys.exit("Unknown type (%s) when formatting column at %s" % (type(col[0]), node.name))
-	return fmt
+		print("format_column: Unknown type (%s) at %s" % (type(col[0]), node.name))
+		import pdb; pdb.set_trace()
+	return (fmt, type_code)
+
 
 def visit_nodes(fp):
 	# visit all nodes (groups and datasets) in file

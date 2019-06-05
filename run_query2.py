@@ -103,8 +103,8 @@ class Cloc_info_manager:
 				assert result_type in ("vind", "vrow")
 				result=cur.execute(sql)
 				rows=result.fetchall()
-				print("sql query result for %s" % result_type)
-				pp.pprint(rows)
+				# print("sql query result for %s" % result_type)
+				# pp.pprint(rows)
 				for row in rows:
 					file_id = row[0]
 					file_name = row[1]
@@ -115,14 +115,6 @@ class Cloc_info_manager:
 						sqr[file_id] = { "file_name": file_name, "sq": sq }
 					sqr[file_id]["sq"][pi].append ( {"node": node_path,
 							"node_type": node_type, result_type: row[4:] } )
-
-					# elif pi not in sqr[file_id]:
-					# 	sqr[file_id][pi] = [ {"node": node_path,
-					# 		"node_type": node_type, result_type: row[4:] } ]
-					# else:
-					# 	sqr[file_id][pi].append ( {"node": node_path,
-					# 		"node_type": node_type, result_type: row[4:] } )
-
 		# start of main body of get_sql_query_results
 		qi = self.qi
 		# sql_maker = make_sql.SQL_maker(qi)
@@ -134,15 +126,15 @@ class Cloc_info_manager:
 		num_plocs = len(qi["plocs"])
 		for pi in range(num_plocs):
 			sql = make_sql.make_sql(qi, pi, "normal")
-			print("normal sql is: %s" % sql)
+			# print("normal sql is: %s" % sql)
 			do_sql_query(sql, sqr, pi, "vind", num_plocs)
 			sql = make_sql.make_sql(qi, pi, "table")
-			print("table sql is: %s" % sql)
+			# print("table sql is: %s" % sql)
 			do_sql_query(sql, sqr, pi, "vrow", num_plocs)
 		# save it in object
 		self.sqr = sqr
-		print("sqr = ")
-		pp.pprint(self.sqr)
+		# print("sqr = ")
+		# pp.pprint(self.sqr)
 
 	def compute_query_children(self):
 		# get list of children (attributes or datasets) specified in query
@@ -172,13 +164,13 @@ class Cloc_info_manager:
 			value_type = node_qr[qtype][i+2]
 			value = node_qr[qtype][i+3]
 			# safety check
-			assert value_type in ('n','s','N', 'S', 'c','M')
+			assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'c', 'M')
 			assert node_type in ('g', 'd', 'a', 'G')
 			# assert child_name in children
 			children_info[child_name] = { "node_type": node_type, "value_type": value_type, "value": value }
 		self.sql_children_info = children_info
-		print("sql_children_info = ")
-		pp.pprint(self.sql_children_info)
+		# print("sql_children_info = ")
+		# pp.pprint(self.sql_children_info)
 
 	def compute_query_children_info(self):
 		# create query_children_info dictionary, which for each child specified in query, has form:
@@ -203,14 +195,14 @@ class Cloc_info_manager:
 				# specified subscript not found, so unable to obtain value for this child
 				self.query_children_info = None
 				return
-			drow = sql_ci["value_type"] in ("N", "c", "M")  # set true if part of dynamic row
+			drow = sql_ci["value_type"] in ("I", "F", "c", "M")  # set true if part of dynamic row
 			assert sql_ci["node_type"] in ("d", "a")  # should be either attribute or dataset
 			node_type = "attribute" if sql_ci["node_type"] == "a" else "Dataset"
 			query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
 				"node_type": node_type, "using_index": using_index}
 		self.query_children_info = query_children_info
-		print("query_children_info = ")
-		pp.pprint(self.query_children_info)
+		# print("query_children_info = ")
+		# pp.pprint(self.query_children_info)
 
 	def decode_sql_value(self, subscript, packed_value, value_type):
 		# convert packed_value (saved as string in sqlite) into list that can be used directly
@@ -218,10 +210,11 @@ class Cloc_info_manager:
 		# subscript is subscript used to access value stored in column of array or None if not
 		# present.
 		# value_type is "c" if subscript needed, otherwise something else
-		# all possible value types are: ('n','s','N', 'S', 'c','M'),
-		# -- either: n-number, s-string, N-number array, S-string array, c-compound or 2-d
-		# -- M - string array part of table (type 'N' and 'c' also part of table)
-		assert value_type in ('n','s','N', 'S', 'c','M')
+		# all possible value types are: ('i', 'f', 's','I', 'F', 'S', 'c','M'),
+		# -- either: i-integer, f-float, s-string, I-int array, F-float array,
+		#    S-string array, c-compound or 2-d
+		#    M - string array part of table (type 'I', 'F' and 'c' also part of table)
+		assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'c', 'M')
 		subscript_needed = value_type == "c"
 		have_subscript = subscript is not None
 		if subscript_needed != have_subscript:
@@ -229,8 +222,17 @@ class Cloc_info_manager:
 			# value required (from query) does not match value stored
 			return None
 		# check for numeric scalar
-		if value_type == 'n':
+		if value_type in ('i', 'f'):
+			assert ((value_type == 'i' and isinstance(packed_value, int))
+				or (value_type == 'f' and isinstance(packed_value, float))
+				or (packed_value == 'nan') )
 			value = [packed_value, ] # return list of one number
+			using_index = False
+			return (value, using_index)
+		# check for single string
+		if value_type in ('s'):
+			assert (isinstance(packed_value, str))
+			value = [packed_value, ] # return list of one string
 			using_index = False
 			return (value, using_index)
 		# strip off "_index" values if present
@@ -240,24 +242,36 @@ class Cloc_info_manager:
 		if have_subscript:
 			subscripts, semicolon, concatenated_columns = sql_ci["value"].partition(";")
 			available_subscripts = subscripts.split(",")
-			found_subscript = subscript in available_subscripts
+			# last character of subscript is type code.  Extract names and type codes
+			available_subscript_types = [x[-1] for x in available_subscripts]
+			available_subscript_names = [x[0:-1] for x in available_subscripts]
+			found_subscript = subscript in available_subscript_names
 			if found_subscript:
-				index = available_subscripts.index(subscript)
-				packed_value = concatenated_values.split(";")[index]
+				index = available_subscript_names.index(subscript)
+				type_code = available_subscript_types[index]
+				packed_value = concatenated_columns.split(";")[index]
 			else:
 				# specified subscript not found
 				return None
+			# replace value_type 'c' with type_code obtained from last character of column subscript
+			assert(value_type == 'c')
+			value_type = type_code
 		# unpack packed_values
-		if value_type == "n":
-			value = list(float(packed_value))
-		elif value_type == 's':
-			value = [packed_value, ]  # convert to list with one element
-		elif value_type == 'N' or (value_type == 'c' and packed_value[0] != "'"):
-			# list of numbers.  (list of strings start with "'"):
+		# if value_type == "n":
+		# 	value = list(float(packed_value))
+		# elif value_type == 's':
+		# 	value = [packed_value, ]  # convert to list with one element
+		if value_type == 'I':
+			# list of integers
+			value = list(map(int, packed_value.split(',')))
+		elif value_type == 'F':
+			# list of floats
 			value = list(map(float, packed_value.split(',')))
 		else:
 			# should be array of strings
-			assert packed_value[0] == "'" and packed_value[-1] == "'"
+			assert packed_value[0] == "'" and packed_value[-1] == "'", (
+				"decode_sql_value: packed value '%s' not string, value_type == '%s'" % (
+					packed_value, value_type))
 			value = packed_value[1:-2].split("','")
 		if using_index:
 			# need to modify list of items using _index values
@@ -324,7 +338,8 @@ def runsubquery(pi, cim, qr):
 		if found:
 			# found some results, save them
 			node_name = cim.get_node_name()
-			node_result = results.Node_result(node_name, vi_res, vtbl_res)
+			# in following put a slash in front of the node so the path will start with a '/'
+			node_result = results.Node_result('/' + node_name, vi_res, vtbl_res)
 			qr.add_node_result(node_result, pi)
 
 	def get_individual_values(editoken, vi_res):

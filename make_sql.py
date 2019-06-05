@@ -37,8 +37,8 @@ def make_sql(qi, cpi, query_type):
 	sql_select.append("%s.node_type as node_type" % parent_node_alias)
 	sql_from.append("node as %s" % parent_node_alias)
 	sql_from.append("path as %s" % parent_path_alias)
-	# replace '*' in path with '%' for LIKE operator and remove any leading '/' for searching
-	like_path = qi['plocs'][cpi]['path'].replace("*", "%").lstrip("/")
+	# replace '*' in path with '%' for LIKE operator and remove any leading or trailing '/' for searching
+	like_path = qi['plocs'][cpi]['path'].replace("*", "%").strip("/")
 	sql_where.append("%s.path LIKE '%s'" % (parent_path_alias, like_path))
 	sql_where.append("%s.id = %s.path_id" % (parent_path_alias, parent_node_alias))
 	sql_where.append("f.id = %s.file_id" % parent_node_alias)
@@ -54,7 +54,7 @@ def make_sql(qi, cpi, query_type):
 		# commented out below line because do not need colnames in results
 		# sql_select.append("%s.sval as %s" % (colnames_value_alias, colnames_name_alias))
 
-	# done appending query parts for parent location (ploc), except for expression in where
+	# done appending query parts for parent location (ploc)
 	# Append query parts for each display child
 	# first make list of all children to display, including display_clocs and those in expression
 	clocs = qi["plocs"][cpi]["display_clocs"] + [ qi["tokens"][i] for i in qi["plocs"][cpi]["cloc_index"] ]
@@ -90,7 +90,7 @@ def make_sql(qi, cpi, query_type):
 		else:
 			# this child is display only, not in expression, or it's a table query. Either way,
 			# Can't determine type of value (string or number)
-			value_select = "case when %s.type = 'n' then %s.nval else %s.sval end" % (
+			value_select = "case when %s.type in ('i', 'f') then %s.nval else %s.sval end" % (
 				child_value_alias, child_value_alias, child_value_alias)
 		sql_select.append("'%s'" % cloc)  # include name of child location in select
 		sql_select.append("%s.node_type as node_type" % child_node_alias)  # include node_type in select
