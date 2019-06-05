@@ -14,15 +14,27 @@ queries = [
 ]
 
 
-def make_patch(ti):
+def find_subqueries(ti):
+	# locate subqueries in query,  Return list of index ranges for subqueries
+	subquery_indices = []
+	for ploc_info in ti['plocs']:
+		ploc = ploc_info[0]
+		cloc_indices = ploc_info[1:]
+		
+
 	stack = []  # contains tokens and positions
 	current_ploc = 0;
 	last_cloc = ti['plocs'][current_ploc][-1]   # index to last cloc in current ploc
-	subquery_indices = []
-	for i in range(ti['ttypes']):
-		ttype = ti['ttypes'][i];
+
+	stack.append(("START", 0))
+	for i in range(ti['ttypes'] + 1):
+		ttype = "END" if i == len(ti['ttypes']) else ti['ttypes'][i];
 		if ttype == "(":
 			stack.append(ttype, i)
+		elif ttype == "CLOC":
+			assert stack[-1] is 
+		elif ttype == "NC" or ttype == "SC":
+			# found constant, should be CLOC OP
 		elif ttype == ")":
 			if (!stack):
 				sys.exit("Unmatched parentheses: closing ')' found, but no matching opening '('")
