@@ -56,24 +56,27 @@ def make_sql(qi, cpi, query_type):
 	# Append query parts for each display child
 	# first make list of all children to display, including display_clocs and those in expression
 	clocs = qi["plocs"][cpi]["display_clocs"] + [ qi["tokens"][i] for i in qi["plocs"][cpi]["cloc_index"] ]
-	# following for keeping track of which child locations (clocs) are included on the call
-	# this is needed to be sure some clocs are not included multiple times which could happen with
-	# different subscripts since the subscripts are ignored when doing the SQL query
-	included_clocs = []
-	# custom_call_values = [] # for storing value table elements passed to custom call for nwb 2 table
+	# following for keeping track of which child locations (clocs) are included on the generated sql.
+	# It maps cloc to the child_value_alias so the value can be used again in the expression.
+	# This is needed to be sure some clocs are not included multiple times which could happen with
+	# different subscripts since the subscripts are ignored when doing the SQL query.  Also a given
+	# cloc may appear more than once in an expression, such as the query:
+	# '/epochs/* : (start_time>100 & start_time<110)'
+	child_value_aliases = {}
 	for ic in range(len(clocs)):
 		cloc = clocs[ic]  # actual name of child location
 		if cloc in qi['plocs'][cpi]['cloc_parts']:
 			# this has a subscript, replace by name without subscript
 			cloc = qi['plocs'][cpi]['cloc_parts'][cloc][0]
-		if cloc in included_clocs:
-			# this cloc was already included in the SQL, do not include it again
-			continue
-		included_clocs.append(cloc)
-		cloc_alias_base = "%s%i" % (ploc_alias_base, ic) # e.g. "ba0" for 1st parent, 1st child; bb3 -2nd parent, 4rd child
-		child_node_alias = "%sn" % cloc_alias_base
-		child_name_alias = "%sna" % cloc_alias_base
-		child_value_alias = "%sv" % cloc_alias_base
+		have_child_value_alias = cloc in child_value_aliases
+		if not have_child_value_alias:
+			cloc_alias_base = "%s%i" % (ploc_alias_base, ic) # e.g. "ba0" for 1st parent, 1st child; bb3 -2nd parent, 4rd child
+			child_node_alias = "%sn" % cloc_alias_base
+			child_name_alias = "%sna" % cloc_alias_base
+			child_value_alias = "%sv" % cloc_alias_base
+			child_value_aliases[cloc] = child_value_alias
+		else:
+			child_value_alias = child_value_aliases[cloc]
 		# get child token index if this child is in the expression
 		eti = ic - len(qi["plocs"][cpi]["display_clocs"])  # expression token index
 		cti = qi["plocs"][cpi]["cloc_index"][eti] if eti >= 0 else -1
@@ -85,9 +88,16 @@ def make_sql(qi, cpi, query_type):
 			is_string = qi["ttypes"][cti+2] == "SC"
 			value_select = "%s.sval" % child_value_alias if is_string else "%s.nval" % child_value_alias
 			editokens[cti] = value_select
+			if have_child_value_alias:
+				# now that have edited the tokens, if already processed this child, no need to do anything else
+				# possible todo: check for mismatch in child use, e.g. used as both string and number in expression
+				continue
 		else:
 			# this child is display only, not in expression, or it's a table query. Either way,
 			# Can't determine type of value (string or number)
+			if have_child_value_alias:
+				# value is already selected, no need to select it again
+				continue
 			value_select = "case when %s.type in ('i', 'f') then %s.nval else %s.sval end" % (
 				child_value_alias, child_value_alias, child_value_alias)
 		sql_select.append("'%s'" % cloc)  # include name of child location in select
