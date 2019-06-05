@@ -553,7 +553,7 @@ def main():
 	global default_dbname, con
 	arglen = len(sys.argv)
 	if arglen < 2 or arglen > 3:
-		print("Usage: %s <db_path> [ <query> ]" % sys.argv[0])
+		print("Usage: python %s <db_path> [ <query> ]" % sys.argv[0])
 		print(" <path> = path to sqlite3 database file or '-' for default database (%s)" % default_dbname)
 		print(" <query> = query to execute (optional).  If present, must be quoted.")
 		sys.exit("")

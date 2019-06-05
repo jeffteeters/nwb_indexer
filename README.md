@@ -4,8 +4,14 @@ files using a query syntax similar to that used in the NWB Query Engine.
 These tools were developed for searching within NWB files.
 
 ## Requirements:
-Python 3.6
-(Tested with anaconda Python 3.6; might work with other versions too).
+Python 3.7
+(Tested with anaconda Python 3.7; might work with other versions too).
+
+parsimonious parser. Described at:
+https://pypi.org/project/parsimonious/
+Can be installed using:
+
+`pip install parsimonious`
 
 ## Usage:
 
@@ -20,33 +26,189 @@ where:
 
 This should scan all the nwb files in the directory and save the
 information about the small datasets and attributes in an SQLite3 database.
-Name of the database file will be "nwb_index.db".
+Name of the database file will be "nwb_index.db".  The program can be
+run multiple times with different directories to index additional
+NWB files.
 
 
 ### 2) Running queries.
 
 Queries can be run by running:
 
-`python run_query.py  [ <index_file> ]`
+`python query_index.py <index_file> [ <query> ]`
 
-Where the optional `<index_file>` is the name of a SQLite3 databaes created in
-step 1.  (Default is "nwb_index.db").
+`<index_file>` = path to sqlite3 database file created in step 1 or '-' for the default database (nwb_index.db)
+
+`<query>` = query to execute (optional).  If present, must be quoted.  If not present, interactive mode is used
+which allows entering multiple queries.
 
 
-Queries are entered using the format described in the NWB Query Engine paper, except that:
-* ":" is used instead of "=", and the parentheses are not required.  (I call the location before the ":", the "parent location").
-* The parent location and ":" can be left off, which is the same as parent location == "*" (search entire tree).
+Queries are entered using the format described in the NWB Query Engine paper except:
+* Any wildcards (*) in the parent location must be specified otherwise an absolute location is assumed.
+* Values to be displayed can be specified by a list of child names separated by comma's before the expression.
 * String constants must always be enclosed in either single or doulble quotes.
 * Any string constant used with LIKE must have wildcards ("%" or "_") explicitly included (if no wildcards are included, the query does an exact match).
-* The expression on the right must always have a relational operator.  Just giving the child location (e.g. `epochs:(start_time)`) is currently not allowed.
+* There must be an expression on the right with a relational operator.  Just giving the child location (e.g. `epochs:(start_time)`) is currently not allowed.
 
-* Currently the queries only work for dataset values, not for any attributes (of groups or datasets).
-The database schema (given in file "build_index.py" might need to be changed to have queries search 
-both groups and datasets.  Or there might need to be a way to specify explicitly whether the
-child value being searched for is a group attribute, dataset attribute or dataset value.
 
-#### Example queries (Datasets):
+#### Example query (NWB 1.x files):
+
 (Using same datasets at the NWB Query Engine test site: http://eeg.kiv.zcu.cz:8080/nwb-query-engine-web/)
+
+`time python query_index.py - '/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 150'`
+
+Output:
+```
+Opening 'nwb_index.db'
+Found 2 matching files:
+[   {   'file': '../sample_data/data_structure_ANM210862_20130627.nwb',
+        'subqueries': [   [   {   'node': '/general/subject',
+                                  'vind': {   'age': [   '3 months 16 days  '
+                                                         'weeks'],
+                                              'species': ['Mus musculus']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/',
+                                  'vind': {   'file_create_date': [   '2017-04-24T11:32:54.21588']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/epochs/trial_001',
+                                  'vind': {'start_time': [2.284463]},
+                                  'vtbl': {}}]]},
+    {   'file': '../sample_data/data_structure_ANM210863_20130627.nwb',
+        'subqueries': [   [   {   'node': '/general/subject',
+                                  'vind': {   'age': [   '3 months 16 days  '
+                                                         'weeks'],
+                                              'species': ['Mus musculus']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/',
+                                  'vind': {   'file_create_date': [   '2017-04-24T11:32:54.07628']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/epochs/trial_001',
+                                  'vind': {'start_time': [2.222392]},
+                                  'vtbl': {}}]]}]
+
+real				  0m0.567s
+user				  0m0.363s
+sys				  0m0.086s
+```
+
+#### Example query (NWB 2.x files):
+
+`time python query_index.py - '/units: id, location, quality > 0.93'`
+
+Output:
+
+```
+Opening 'nwb_index.db'
+Found 1 matching files:
+[   {   'file': '../pynwb_examples/tutorials_python/general/basic_example.nwb',
+        'subqueries': [   [   {   'node': '/units',
+                                  'vind': {},
+                                  'vtbl': {   'child_names': [   'id',
+                                                                 'location',
+                                                                 'quality'],
+                                              'row_values': [   (   1,
+                                                                    'CA1',
+                                                                    0.95)]}}]]}]
+
+real								    0m0.485s
+user								    0m0.399s
+sys								    0m0.047s
+```
+
+
+# search_nwb.py
+
+The search_nwb.py utility operates like the NWB Query Engine, searching either all nwb files in a directory or a specific NWB file.
+
+It is run using:
+
+```
+search_nwb.py <path> [ <query> ]
+ <path> = path to NWB file or directory or '-' for default path.
+ <query> = query to execute (optional).  If present, must be quoted.
+```
+
+#### Example query (NWB 1.0x files):
+
+`time python search_nwb.py ../sample_data/ '/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 150'`
+
+Output:
+
+```
+Found 2 matching files:
+[   {   'file': '../sample_data/data_structure_ANM210862_20130627.nwb',
+        'subqueries': [   [   {   'node': '/general/subject',
+                                  'vind': {   'age': [   b'3 months 16 days  weeks'],
+                                              'species': [b'Mus musculus']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/',
+                                  'vind': {   'file_create_date': [   b'2017'
+                                                                      b'-04-'
+                                                                      b'24T1'
+                                                                      b'1:32'
+                                                                      b':54.'
+                                                                      b'2158'
+                                                                      b'83']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/epochs/trial_001',
+                                  'vind': {'start_time': [2.284463]},
+                                  'vtbl': {}}]]},
+    {   'file': '../sample_data/data_structure_ANM210863_20130627.nwb',
+        'subqueries': [   [   {   'node': '/general/subject',
+                                  'vind': {   'age': [   b'3 months 16 days  weeks'],
+                                              'species': [b'Mus musculus']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/',
+                                  'vind': {   'file_create_date': [   b'2017'
+                                                                      b'-04-'
+                                                                      b'24T1'
+                                                                      b'1:32'
+                                                                      b':54.'
+                                                                      b'0762'
+                                                                      b'84']},
+                                  'vtbl': {}}],
+                          [   {   'node': '/epochs/trial_001',
+                                  'vind': {'start_time': [2.222392]},
+                                  'vtbl': {}}]]}]
+
+real				  0m16.788s
+user				  0m14.445s
+sys				  0m1.172s
+```
+
+The output is the same as for query_index.py, except strings displayed as bytes instead of python strings.  This is because
+the strings are stored as bytes in the NWB (HDF5) file but as strings in the sqlite3 database.  TODO: Need to
+explain this better.  The time for the query is much longer (15 seconds vs less than 1 second for the query_index.py tool).
+
+
+
+#### Example query (NWB 2.x files):
+
+`time python search_nwb.py ../pynwb_examples/ '/units: id, location, quality > 0.93'`
+
+Output:
+```
+Found 1 matching files:
+[   {   'file': '../pynwb_examples/tutorials_python/general/basic_example.nwb',
+        'subqueries': [   [   {   'node': '/units',
+                                  'vind': {},
+                                  'vtbl': {   'child_names': [   'id',
+                                                                 'location',
+                                                                 'quality'],
+                                              'row_values': [   (   1,
+                                                                    'CA1',
+                                                                    0.95)]}}]]}]
+
+real								    0m1.245s
+user								    0m0.383s
+sys								    0m0.208s
+```
+
+
+
+
+## Old documentation below, not updated. Queries may work, but output will be different.
+
 
 `/:session_start_time LIKE "%Jun __ 2013%"`
 
