@@ -6,7 +6,7 @@ import numpy as np
 import math
 
 # global variables
-dbname="nwb_idx2.db"  # default database name
+dbname="nwb_index.db"  # default database name
 con = None     # database connection
 cur = None     # database cursor
 file_id = None # id of current file (id of row in sqlite2 "file" table)
@@ -68,12 +68,14 @@ create table value (			-- value of dataset or attribute
 	id integer primary key,
 	type char(1) not null CHECK( type IN ('i', 'f','s','I', 'F', 'S', 'c','M') ),
 		-- either: i-integer, f-float, s-string, I-integer array, F-float array,
-		--		S-string array, c-compound or 2-d
-		-- M - string array part of table (type 'I', 'F' and 'c' also part of table)
-	-- compound_cols text,		-- comma seperated list of columns names if compound type, otherwise NULL
-	nval numeric,				-- contains value of number, if type 'i' or 'f'.  Otherwise, NULL
-	sval text					-- stores values of type s, I, F, S, c as comma seperated values otherwise NULL
-		-- if type 'c', has list of columns names first, then lists of column values, lists seperated by ';'
+		--		   S-string array, c-compound or 2-d
+		--         M-string array part of table (type 'I', 'F' and 'c' also part of table)
+	nval numeric,		-- contains value of number, if type 'i' or 'f'.  Otherwise, NULL.
+	sval text			-- stores values of type s, I, F, S, c as comma seperated values otherwise NULL
+		-- If type 'c' has list of columns names with column type char at end of each name, then lists
+		-- of column values.  Each list element separated by ',' and lists seperated by ';'.
+		-- For all table types ('I', 'F', 'c') values in associated _index dataset (if present) stored
+		-- after column values, separated by ";i;"  
 );
 
 create index nval_idx on value(nval) where nval is not NULL;  -- Help speedup searches for scalars

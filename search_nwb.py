@@ -2,17 +2,17 @@ import sys
 import os
 import h5py
 import numpy as np
-import parse2
 import pprint
 import readline
 import re
-import results
+import lib.parse as parse
+import lib.results as results
 
 # Tool or searching NWB files, both version 1 and 2.
 #
 # If reading this code to figure out how it works
 # READ FROM THE BOTTOM TO THE TOP, starting with function main.
-# The code uses the parser in file parse2.py
+# The code uses the parser in file parse.py
 
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -410,7 +410,7 @@ def query_directory(dir, qi):
 				query_file(path, qi)
 
 def query_file_or_directory(path, qi):
-	# run a query on path, query specified in qi (query information, made in parse2.parse)
+	# run a query on path, query specified in qi (query information, made in parse.parse)
 	global compiled_query_results
 	# initialize results for storing result of query
 	compiled_query_results = results.Results()
@@ -430,7 +430,7 @@ def do_interactive_queries(path):
 			query=input("> ")
 		except EOFError:
 			break;
-		qi = parse2.parse(query)
+		qi = parse.parse(query)
 		query_file_or_directory(path, qi)
 	print("\nDone running all queries")
 
@@ -440,7 +440,7 @@ def process_command_line(path, query):
 	if query is None:
 		do_interactive_queries(path)
 	else:
-		qi = parse2.parse(query)
+		qi = parse.parse(query)
 		query_file_or_directory(path, qi)
 
 def main():

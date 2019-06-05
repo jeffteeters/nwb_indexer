@@ -3,16 +3,16 @@ import os
 import sqlite3
 import re
 import readline
-import parse2
-import make_sql
 import pprint
-import results
+import lib.parse as parse
+import lib.results as results
+import lib.make_sql as make_sql
 
 readline.parse_and_bind('tab: complete')
 pp = pprint.PrettyPrinter(indent=4)
 
 # global variables
-default_dbname="nwb_idx2.db"
+default_dbname="nwb_index.db"
 con = None     # database connection
 cur = None       # cursor
 
@@ -48,7 +48,7 @@ class Cloc_info_manager:
 
 	# for finding values (in sqlite3 database) associated with child locations (cloc's) in query
 	def __init__(self, qi):
-		# qi is query information, output of parse2.
+		# qi is query information, output of parse.
 		self.qi = qi
 		self.compute_sql_query_results()
 
@@ -537,7 +537,7 @@ def do_interactive_queries():
 			query=input("> ")
 		except EOFError:
 			break;
-		qi = parse2.parse(query)
+		qi = parse.parse(query)
 		perform_query(qi)
 	print("\nDone running all queries")
 
@@ -546,7 +546,7 @@ def process_command_line(query):
 	if query is None:
 		do_interactive_queries()
 	else:
-		qi = parse2.parse(query)
+		qi = parse.parse(query)
 		perform_query(qi)
 
 def main():

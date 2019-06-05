@@ -1,10 +1,10 @@
 # function to generate SQL from parsed query
-import parse2  # only used if testing
+import lib.parse as parse  # only used if testing
 
 
 def make_sql(qi, cpi, query_type):
 	# create query parts
-	# qi (query information, output of parse2.parse)
+	# qi (query information, output of parse.parse)
 	# cpi (current ploc index, same as subquery index)
 	# query_type, must be either:
 	#  - "normal" indicates normal query (not NWB 2 table groups)
@@ -148,7 +148,7 @@ def main():
 	for query in queries:
 		if query:
 			print ("query=%s"% query)
-			qi = parse2.parse(query)
+			qi = parse.parse(query)
 			sql_maker = SQL_maker(qi)
 			for cpi in range(len(qi["plocs"])):
 				print("ploc %i, normal sql:" % cpi)
