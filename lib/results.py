@@ -99,10 +99,26 @@ class Vtbl_result:
 
 	def get_value(self):
 		if self.child_names is not None:
-			value = {"child_names": self.child_names, "row_values": self.row_values}
+			# Line below returns results for each row as a list
+			# value = {"child_names": self.child_names, "row_values": self.row_values}
+			self.make_combined_value()
+			value = {"child_names": self.child_names, 
+				"row_values": self.row_values, "combined": self.combined_values}
 		else:
 			value = {}
 		return value
+
+	def make_combined_value(self):
+		# generate format of results with each row a dictionary containing child: value
+		combined_values = []
+		for row in self.row_values:
+			row_result = {}
+			for i in range(len(self.child_names)):
+				child_name = self.child_names[i]
+				value = row[i]
+				row_result[child_name] = value
+			combined_values.append(row_result)
+		self.combined_values = combined_values
 
 
 def main():
