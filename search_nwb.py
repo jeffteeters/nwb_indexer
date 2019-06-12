@@ -36,37 +36,47 @@ def make_indexed_lists(tags, tags_index):
 
 # from: https://stackoverflow.com/questions/39502461/truly-recursive-tolist-for-numpy-structured-arrays
 def array_to_list(array):
-    if isinstance(array, np.ndarray):
-        return array_to_list(array.tolist())
-    elif isinstance(array, list):
-        return [array_to_list(item) for item in array]
-    elif isinstance(array, tuple):
-        return tuple(array_to_list(item) for item in array)
-    else:
-        return array
+	if isinstance(array, np.ndarray):
+		return array_to_list(array.tolist())
+	elif isinstance(array, list):
+		return [array_to_list(item) for item in array]
+	elif isinstance(array, tuple):
+		return tuple(array_to_list(item) for item in array)
+	elif isinstance(array, bytes):
+		# replace bytes by utf string
+		return array.decode("utf-8")
+	else:
+		return array
 
 def convert_to_list(cloc_vals):
 	if isinstance(cloc_vals, np.ndarray):
 		list_vals = array_to_list(cloc_vals) # convert numpy ndarray to list
 	else:
+		if isinstance(cloc_vals, bytes):
+			# convert bytes to string
+			cloc_vals = cloc_vals.decode("utf-8")
 		list_vals = [cloc_vals, ]  # convert scalar to list with one element
 	return list_vals
 
 def make_subquery_call_string(qi):
 	# build expression that calls runsubquery for each subquery
+	# Calls are inserted in place of expression in tokens for each parent location
+	# If there is no expression, calls are inserted where the expression would be if there was one
 	cs_tokens = []   # cs == call string, (e.g. call string tokens)
-	cpi = 0  # current ploc index
-	i = 0
-	while i < len(qi['tokens']):
-		if cpi >= len(qi['plocs']) or i != qi['plocs'][cpi]["range"][0]:
-			# either past the last ploc, or not yet to the start of range of the current ploc
-			cs_tokens.append(qi["tokens"][i])
-			i += 1
-		else:
-			# this token is start of expression for subquery, replace by call
-			cs_tokens.append("runsubquery(%i,fp,qi,qr)" % cpi)
-			i = qi['plocs'][cpi]["range"][1]  # advance to end (skiping all tokens in subquery)
-			cpi += 1
+	ila = 0	# index last added tokan
+	for cpi in range(len(qi['plocs'])):
+		# add any tokens before the ones in this expression
+		while ila < qi['plocs'][cpi]["range"][0]:
+			cs_tokens.append(qi["tokens"][ila])
+			ila += 1
+		# add in call
+		cs_tokens.append("runsubquery(%i,fp,qi,qr)" % cpi)
+		# skip to end of tokens for this subquery
+		ila = qi['plocs'][cpi]["range"][1]
+	# add any tokens needed at end of last parent expression
+	while ila < len(qi["tokens"]):
+		cs_tokens.append(qi["tokens"][ila])
+		ila += 1
 	return " ".join(cs_tokens)
 
 def get_search_criteria(cpi, qi):
@@ -90,7 +100,9 @@ def get_search_criteria(cpi, qi):
 		if not start_path:
 			start_path = "/"
 		search_all = True   # search all if wildcard character in parent location
-		match_path = ploc.replace("*", ".*")  # replace * with *. for RE match later
+		# force match path to start with slash for matching names of node paths in h5py
+		match_path = ploc if ploc[0] == "/" else "/" + ploc
+		match_path = match_path.replace("*", ".*")  # replace * with *. for RE match later
 	else:
 		start_path = ploc
 		match_path = None
@@ -348,9 +360,12 @@ def runsubquery(cpi, fp, qi, qr):
 		sqr = qi["plocs"][cpi]["range"]  # subquery range
 		equery = [ "and" if x == "&" else "or" if x == "|" else x for x in sc["editoken"][sqr[0]:sqr[1]]]
 		equery = " ".join(equery)  # make it a single string
+		if equery == "":
+			# there is no expression (only child being displayed).  Set to True so will display any values found
+			equery = "True"
 		# print("equery is: %s" % equery)
 		if len(cvals) == 0:
-			# are no column values in this expression.  Just evaluate it
+			# no column values in this expression
 			result = eval(equery)
 		else:
 			zipl = list(zip(*(cvals)))
@@ -369,6 +384,7 @@ def runsubquery(cpi, fp, qi, qr):
 	sc = get_search_criteria(cpi, qi)
 	# print("sc = %s" % sc)
 	if sc['start_path'] not in fp:
+		# import pdb; pdb.set_trace()
 		# did not even find starting path in hdf5 file, cannot do search
 		return False
 	start_node = fp[sc['start_path']]
@@ -393,12 +409,12 @@ def query_file(path, qi):
 	# initialize File_result object for storing subquery results
 	qr = results.File_result(path, len(qi["plocs"]))
 	subquery_call_string = make_subquery_call_string(qi)
-	# print("%s" % subquery_call_string)
 	# will be like: runsubquery(0,fp,qi,qr) & runsubquery(1,fp,qi,qr)
+	# print("subquery_call_string is: %s" % subquery_call_string)
 	result = eval(subquery_call_string)
 	if result:
 		compiled_query_results.add_file_result(qr)
-	 	# display_result(path, qr)
+		# display_result(path, qr)
 
 def query_directory(dir, qi):
 	# must find files to query.  dir must be a directory
@@ -461,4 +477,4 @@ def main():
 	process_command_line(path, query)
 
 if __name__ == "__main__":
-    main()
+	main()

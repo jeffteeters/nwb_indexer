@@ -9,14 +9,14 @@ pp = pprint.PrettyPrinter(indent=4, width=120, compact=True)
 # Parser implemented using parsimonious, https://pypi.org/project/parsimonious/
 
 grammar = Grammar(
-    r"""
+   r"""
     query       = ws subquery ( ws andor ws subquery ws )*
     subquery    = (local_sq / parnsq)
     local_sq    = parent ws colon ws display_list* expression?
     parnsq      = lparn query rparn 
     parent      = ~r"[\w/*]+"
     colon       = ":"
-    display_list = disp_child ws "," ws
+    display_list = disp_child ws !relop ("," ws)?
     expression  = ws child_compare ws (andor ws child_compare ws )*
     child_compare = ( pair_compare  / parnexp )
     pair_compare = child ws relop ws ( number / string)
@@ -26,17 +26,16 @@ grammar = Grammar(
     disp_child  = child_name subscript?
     child_name  = ~r"[\w]+"
     subscript   = ~r"\[[\w]+\]"
-    string      = ~r'"[^"]*"'
+    string      = ~r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)"
     number      = ~r"[0-9]+(\.[0-9]+)?"
     andor       = ("&" / "|")
     lparn       = "("
     rparn       = ")"
     ws          = ~"\s*"
-    """
-)
-    # old
-    # child       = ~r"[\w]+(\[[\w]+\])?"
-    # disp_child  = ~r"[\w]+(\[[\w]+\])?"
+    """)
+
+#     string      = ~r'"[^"]*"'
+#     string      = ~r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'"
 
 def get_subqueries(qi):
     # return list of subqueries from query information (qi)
@@ -207,12 +206,25 @@ def parse(query):
 def run_tests():
     test_queries = [
         # "p1:(a > 1 & p2: x>y)",  # fails
-        "units: p, r[0], interval[foo] > 14",
-        "(ploc1: p,q, r, (a >= 22 & b LIKE \"sue\") | (ploc2: t, m <= 14 & ploc3: x < 23))",
-        "(ploc1: (a > 22 & b LIKE \"sue\") | (ploc2: m < 14 & ploc3: x < 23 & y < 10))",
-        "ploc: p, r, cloc > 23",
-        "(ploc1: p,q, r, (a[bar] >= 22 & b LIKE \"sue\") | (ploc2: t[0], m <= 14 & ploc3: x < 23))",
         # "ploc: cloc1,",
+        # "ploc: cloc1, cloc2, cloc3,",
+        # "ploc:cloc1,cloc2,cloc3,",
+        # "ploc: cloc1, cloc2 > 3",
+        # "ploc: cloc1 > 3",
+        # "ploc: cloc1",
+        # "ploc: cloc1, cloc2, cloc3",
+        # "ploc:cloc1,cloc2,cloc3",
+        # "ploc: cloc1 cloc2 > 3",
+        # "ploc: cloc1 > 3",
+        # 'ploc: cloc1 LIKE "Hello world"',
+        # 'ploc: cloc1 LIKE "Hello Sue\'s world"',
+        "ploc: cloc1 LIKE 'Hello " + '"John' + r"\'s" + '" world' + "'",
+        # "units: p, r[0], interval[foo] > 14",
+        #"(ploc1: p,q, r, (a >= 22 & b LIKE \"sue\") | (ploc2: t, m <= 14 & ploc3: x < 23))",
+        #"(ploc1: (a > 22 & b LIKE \"sue\") | (ploc2: m < 14 & ploc3: x < 23 & y < 10))",
+        #"ploc: p, r, cloc > 23",
+        #"(ploc1: p,q, r, (a[bar] >= 22 & b LIKE \"sue\") | (ploc2: t[0], m <= 14 & ploc3: x < 23))",
+
         # "ploc: cloc LIKE \"Sue Smith\"",
         # "ploc1: cloc > 23 & ploc2: cloc2, cloc3 > 25",
         # "ploc1: a > 22",
