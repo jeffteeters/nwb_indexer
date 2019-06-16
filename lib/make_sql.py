@@ -1,5 +1,4 @@
 # function to generate SQL from parsed query
-import lib.parse as parse  # only used if testing
 
 
 def make_sql(qi, cpi, query_type):
@@ -116,7 +115,12 @@ def make_sql(qi, cpi, query_type):
 	if is_normal_query:
 		i_start = qi['plocs'][cpi]["range"][0]
 		i_end = qi['plocs'][cpi]["range"][1]
-		query_expression = " ".join([t for t in editokens[i_start:i_end]])
+		if i_start < i_end:
+			# expression present
+			query_expression = " ".join([t for t in editokens[i_start:i_end]])
+		else:
+			# expression not present, must be displaying values only.  replace expression with 1 (true)
+			query_expression = "1"
 		sql_where.append('(' + query_expression + ')')
 		# for normal query, parent node must not be group of type "G" (e.g. group with NWB 2 table)
 		sql_where.append("\t%s.node_type != 'G'" % parent_node_alias)
@@ -137,6 +141,7 @@ def make_sql(qi, cpi, query_type):
 
 
 test_queries = """
+/general/subject/: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epochs : start_time < 150
 /ploc_a: cloc_a1 <= 789 & (cloc_a2 >= 200 | cloc_a3 <= 100) | ploc_b: cloc_b1 >= 20 & cloc_b2 LIKE "Name: Smith" & ploc_c: cloc_c1 >= "34 ( : )"
 /general/subject: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epoch : start_time < 150
 /general/subject: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04"
@@ -149,24 +154,21 @@ epochs: start_time>200 & stop_time<250 & /file_create_date LIKE "2017-04"
 epochs: start_time>200 & file_create_date LIKE "2017-04"
 """
 test_queries = """
-/general/subject/: (age LIKE "3 months 16 days" & species LIKE "Mus musculu") & /:file_create_date LIKE "2017-04" & /epochs : start_time < 150
+*: colnames
 """
 
 def main():
+	import parse as parse  # only used if testing
 	global test_queries;
 	queries = test_queries.splitlines()
 	for query in queries:
 		if query:
 			print ("query=%s"% query)
 			qi = parse.parse(query)
-			sql_maker = SQL_maker(qi)
 			for cpi in range(len(qi["plocs"])):
-				print("ploc %i, normal sql:" % cpi)
-				sql = sql_maker.make_normal_sql(cpi)
-				print("%s" % sql)
-				print("ploc %i, table sql:" % cpi)
-				sql = sql_maker.make_table_sql()
-				print("%s" % sql)
+				for query_type in ("normal", "table"):
+					sql = make_sql(qi, cpi, query_type)
+					print("ploc %i, %s sql:\n%s" % (cpi, query_type, sql))
 
 if __name__ == "__main__":
 	main()

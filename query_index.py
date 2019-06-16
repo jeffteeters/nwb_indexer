@@ -459,6 +459,9 @@ def runsubquery(pi, cim, qr):
 		sqr = qi["plocs"][cpi]["range"]  # subquery range
 		equery = [ "and" if x == "&" else "or" if x == "|" else x for x in editoken[sqr[0]:sqr[1]]]
 		equery = " ".join(equery)  # make it a single string
+		if equery == "":
+			# there is no expression (only child being displayed).  Set to True so will display any values found
+			equery = "True"
 		# print("equery is: %s" % equery)
 		if len(cvals) == 0:
 			# are no column values in this expression.  Just evaluate it
@@ -487,21 +490,42 @@ def runsubquery(pi, cim, qr):
 	found = qr.get_subquery_length(pi) > 0	# will have length > 1 if result found
 	return found
 
+# def make_subquery_call_string_old(qi):
+# 	# build expression that calls runsubquery for each subquery
+# 	cs_tokens = []
+# 	cpi = 0  # current ploc index
+# 	i = 0
+# 	while i < len(qi['tokens']):
+# 		if cpi >= len(qi['plocs']) or i != qi['plocs'][cpi]["range"][0]:
+# 			# either past the last ploc, or not yet to the start of range of the current ploc
+# 			cs_tokens.append(qi["tokens"][i])
+# 			i += 1
+# 		else:
+# 			# this token is start of expression for subquery, replace by call
+# 			cs_tokens.append("runsubquery(%i,cim,qr)" % cpi)
+# 			i = qi['plocs'][cpi]["range"][1]  # advance to end (skiping all tokens in subquery)
+# 			cpi += 1
+# 	return " ".join(cs_tokens)
+
 def make_subquery_call_string(qi):
 	# build expression that calls runsubquery for each subquery
-	cs_tokens = []
-	cpi = 0  # current ploc index
-	i = 0
-	while i < len(qi['tokens']):
-		if cpi >= len(qi['plocs']) or i != qi['plocs'][cpi]["range"][0]:
-			# either past the last ploc, or not yet to the start of range of the current ploc
-			cs_tokens.append(qi["tokens"][i])
-			i += 1
-		else:
-			# this token is start of expression for subquery, replace by call
-			cs_tokens.append("runsubquery(%i,cim,qr)" % cpi)
-			i = qi['plocs'][cpi]["range"][1]  # advance to end (skiping all tokens in subquery)
-			cpi += 1
+	# Calls are inserted in place of expression in tokens for each parent location
+	# If there is no expression, calls are inserted where the expression would be if there was one
+	cs_tokens = []   # cs == call string, (e.g. call string tokens)
+	ila = 0	# index last added tokan
+	for cpi in range(len(qi['plocs'])):
+		# add any tokens before the ones in this expression
+		while ila < qi['plocs'][cpi]["range"][0]:
+			cs_tokens.append(qi["tokens"][ila])
+			ila += 1
+		# add in call
+		cs_tokens.append("runsubquery(%i,cim,qr)" % cpi)
+		# skip to end of tokens for this subquery
+		ila = qi['plocs'][cpi]["range"][1]
+	# add any tokens needed at end of last parent expression
+	while ila < len(qi["tokens"]):
+		cs_tokens.append(qi["tokens"][ila])
+		ila += 1
 	return " ".join(cs_tokens)
 
 def perform_query(qi):
