@@ -8,11 +8,38 @@ pp = pprint.PrettyPrinter(indent=4, width=120, compact=True)
 # grammer for NWB Query Engine tools, used by search_nwb2 and nwbindexer
 # Parser implemented using parsimonious, https://pypi.org/project/parsimonious/
 
+# grammar_older = Grammar(
+#    r"""
+#     query       = ws subquery ( ws andor ws subquery ws )*
+#     subquery    = (local_sq / parnsq)
+#     local_sq    = parent ws colon ws display_list* expression?
+#     parnsq      = lparn query rparn 
+#     parent      = ~r"[\w/*]+"
+#     colon       = ":"
+#     display_list = disp_child ws !relop ("," ws)?
+#     expression  = ws child_compare ws (andor ws child_compare ws )*
+#     child_compare = ( pair_compare  / parnexp )
+#     pair_compare = child ws relop ws ( number / string)
+#     parnexp = lparn expression rparn
+#     relop       = ("==" / "<=" / "<" / ">=" / ">" / "!=" / "LIKE")
+#     child       = child_name subscript?
+#     disp_child  = child_name subscript?
+#     child_name  = ~r"[\w]+"
+#     subscript   = ~r"\[[\w]+\]"
+#     string      = ~r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)"
+#     number      = ~r"[0-9]+(\.[0-9]+)?"
+#     andor       = ("&" / "|")
+#     lparn       = "("
+#     rparn       = ")"
+#     ws          = ~"\s*"
+#     """)
+
 grammar = Grammar(
    r"""
     query       = ws subquery ( ws andor ws subquery ws )*
     subquery    = (local_sq / parnsq)
-    local_sq    = parent ws colon ws display_list* expression?
+    local_sq    = parent ws colon ws (( '(' ws rhs ws ')' ws !andor ) / rhs )
+    rhs         = display_list* expression?
     parnsq      = lparn query rparn 
     parent      = ~r"[\w/*]+"
     colon       = ":"
@@ -93,11 +120,9 @@ class IniVisitor(NodeVisitor):
         self.ttypes.append("ROP")
         return visited_children or node
 
-    # def visit_display_list(self, node, visited_children):
-    #     # display_list - list of disp_child locations to display
-    #     self.current_ploc['display_clocs'].append(visited_children[0].text)
-    #     self.add_cloc_parts(visited_children[0].text)
-    #     return visited_children or node
+    def save_possible_expression_start(self, node):
+        # called for tokens that might be the start of an expression
+        self.location_map[node.start] = len(self.tokens)
 
     def visit_disp_child(self, node, visited_children):
         # disp_child - child location to display, may have subscript
@@ -107,21 +132,19 @@ class IniVisitor(NodeVisitor):
 
     def visit_string(self, node, visited_children):
         # string constant
-        self.location_map[node.start] = len(self.tokens)
         self.tokens.append(node.text)
         self.ttypes.append("SC")
         return visited_children or node
 
     def visit_lparn(self, node, visited_children):
         # left parentheses
-        self.location_map[node.start] = len(self.tokens)
+        self.save_possible_expression_start(node)
         self.tokens.append(node.text)
         self.ttypes.append(node.text)
         return visited_children or node
 
     def visit_rparn(self, node, visited_children):
         # right parentheses
-        self.location_map[node.start] = len(self.tokens)
         self.tokens.append(node.text)
         self.ttypes.append(node.text)
         return visited_children or node
@@ -134,25 +157,34 @@ class IniVisitor(NodeVisitor):
 
     def visit_number(self, node, visited_children):
         # numeric constant
-        self.location_map[node.start] = len(self.tokens)
         self.ttypes.append("NC")
         self.tokens.append(node.text)
         return visited_children or node
 
-    def visit_ws(self, node, visited_children):
-        # white space
-        # save end position in location map because that might be looked up
-        self.location_map[node.end] = len(self.tokens)
-        return visited_children or node
+    # def visit_ws(self, node, visited_children):
+    #     # white space
+    #     return visited_children or node
 
     def visit_child(self, node, visited_children):
         # child location that is in an expression
-        self.location_map[node.start] = len(self.tokens)
+        self.save_possible_expression_start(node)
         self.current_ploc['cloc_index'].append(len(self.tokens))
         self.tokens.append(node.text)
         self.ttypes.append("CLOC")
         self.add_cloc_parts(node, visited_children)
         return visited_children or node
+
+    def visit_expression(self, node, visited_children):
+        assert node.start in self.location_map, (
+            "did not find node.start (%i) in location_map: %s, end=%i, text='%s', tokens=%s") % (
+            node.start, self.location_map, node.end, node.text, self.tokens)
+        start_ti = self.location_map[node.start]
+        end_ti = len(self.tokens)
+        if range in self.current_ploc:
+            # this expression should be including previously found expression (enclosed in ())
+            assert start_ti < self.current_ploc['range'][0] and self.current_ploc['range'][1] < end_ti
+        # self.current_ploc['range'] = (self.location_map[node.start], len(self.tokens))
+        self.current_ploc['range'] = (start_ti, end_ti)
 
     def visit_parent(self, node, visited_children):
         # parent location
@@ -161,19 +193,21 @@ class IniVisitor(NodeVisitor):
             self.plocs.append(self.current_ploc)
         self.current_ploc = {'path': node.text, 'cloc_index': [], 'display_clocs': [],
             'cloc_parts': {}}
-        # self.tokens.append(node.text)
         return visited_children or node
 
     def visit_local_sq(self, node, visited_children):
         # local subquery
-        assert node.start in self.location_map, (
-            "did not find node.start (%i) in location_map: %s, end=%i, text='%s', tokens=%s") % (
-            node.start, self.location_map, node.end, node.text, self.tokens)
-        assert node.end in self.location_map, (
-            "did not find node.end (%i) in location_map: %s, start=%i, text='%s', tokens=%s") % (
-            node.end, self.location_map, node.start, node.text, self.tokens)
-        self.current_ploc['range'] = (self.location_map[node.start], self.location_map[node.end])
+        # assert node.start in self.location_map, (
+        #     "did not find node.start (%i) in location_map: %s, end=%i, text='%s', tokens=%s") % (
+        #     node.start, self.location_map, node.end, node.text, self.tokens)
+        # assert node.end in self.location_map, (
+        #     "did not find node.end (%i) in location_map: %s, start=%i, text='%s', tokens=%s") % (
+        #     node.end, self.location_map, node.start, node.text, self.tokens)
+        # self.current_ploc['range'] = (self.location_map[node.start], self.location_map[node.end])
         # self.tokens.append(node.text)
+        if 'range' not in self.current_ploc:
+            # was no expression in this query, set range to be length of current tokens
+            self.current_ploc['range'] = (len(self.tokens), len(self.tokens))
         return visited_children or node
 
     def visit_query(self, node, visited_children):
@@ -205,38 +239,40 @@ def parse(query):
 
 def run_tests():
     test_queries = [
+        "ploc1: a > 3 & ploc2: c < 5 | ploc3: m == 5",
         # "p1:(a > 1 & p2: x>y)",  # fails
-        # "ploc: cloc1,",
-        # "ploc: cloc1, cloc2, cloc3,",
-        # "ploc:cloc1,cloc2,cloc3,",
-        # "ploc: cloc1, cloc2 > 3",
-        # "ploc: cloc1 > 3",
-        # "ploc: cloc1",
-        # "ploc: cloc1, cloc2, cloc3",
-        # "ploc:cloc1,cloc2,cloc3",
-        # "ploc: cloc1 cloc2 > 3",
-        # "ploc: cloc1 > 3",
-        # 'ploc: cloc1 LIKE "Hello world"',
-        # 'ploc: cloc1 LIKE "Hello Sue\'s world"',
-        "ploc: cloc1 LIKE 'Hello " + '"John' + r"\'s" + '" world' + "'",
-        # "units: p, r[0], interval[foo] > 14",
-        #"(ploc1: p,q, r, (a >= 22 & b LIKE \"sue\") | (ploc2: t, m <= 14 & ploc3: x < 23))",
-        #"(ploc1: (a > 22 & b LIKE \"sue\") | (ploc2: m < 14 & ploc3: x < 23 & y < 10))",
-        #"ploc: p, r, cloc > 23",
-        #"(ploc1: p,q, r, (a[bar] >= 22 & b LIKE \"sue\") | (ploc2: t[0], m <= 14 & ploc3: x < 23))",
-
-        # "ploc: cloc LIKE \"Sue Smith\"",
-        # "ploc1: cloc > 23 & ploc2: cloc2, cloc3 > 25",
-        # "ploc1: a > 22",
-        # "ploc1: (a > 22)",
-        # "ploc1: (a > 22 & b < 14)",
-        # "ploc1: (a > 22 & b LIKE \"sue\")",
-        # "ploc1: (a > 22 | b LIKE \"sue\")",
-        # "ploc1: (a > 22 & b LIKE \"sue\" | m < 14)",
-        # "ploc1: (a > 22 & b LIKE \"sue\") | m < 14",
-        # "ploc1: a > 22 & (b LIKE \"sue\" | m < 14)",
-        # "ploc1: (a > 22 & b LIKE \"sue\") | ploc2: m < 14",
-        # "(ploc1: (a > 22 & b LIKE \"sue\") | ploc2: m < 14) & ploc3: x < 23",
+        "ploc: (cloc1,)",
+        "ploc: (cloc1, cloc2, cloc3,)",
+        "(ploc1: (x > 233) & ploc2: z, y > 13) | (ploc3: (q == 23.3) & ploc4: (sue))",
+        "ploc:(cloc1,cloc2,cloc3,)",
+        "ploc: (cloc1, cloc2 > 3)",
+        "ploc: (cloc1 > 3)",
+        "ploc: (cloc1)",
+        "ploc: (cloc1, cloc2, cloc3)",
+        "ploc:(cloc1,cloc2,cloc3)",
+        "ploc: ( cloc1 cloc2 > 3 )",
+        "ploc: ( cloc1 > 3)",
+        'ploc: (cloc1 LIKE "Hello world")',
+        'ploc: (cloc1 LIKE "Hello Sue\'s world")',
+        "ploc: (cloc1 LIKE 'Hello " + '"John' + r"\'s" + '" world' + "')",
+        "units: (p, r[0], interval[foo] > 14)",
+        # "(ploc1: (p,q, r, (a >= 22 & b LIKE \"sue\")) | (ploc2: (t, m <= 14 & ploc3: x < 23)))", # should fail
+        "(ploc1: (a > 22 & b LIKE \"sue\") | (ploc2: m < 14 & ploc3: x < 23 & y < 10))",
+        "ploc: p, r, cloc > 23",
+        "(ploc1: p,q, r, (a[bar] >= 22 & b LIKE \"sue\") | (ploc2: t[0], m <= 14 & ploc3: x < 23))",
+        "ploc: cloc LIKE \"Sue Smith\"",
+        "ploc1: cloc > 23 & ploc2: cloc2, cloc3 > 25",
+        "ploc1: a > 22",
+        "ploc1: (a > 22)",
+        "ploc1: (a > 22 & b < 14)",
+        "ploc1: (a > 22 & b LIKE \"sue\")",
+        "ploc1: (a > 22 | b LIKE \"sue\")",
+        "ploc1: (a > 22 & b LIKE \"sue\" | m < 14)",
+        "ploc1: ((a > 22 & b LIKE \"sue\") | m < 14)",
+        "ploc1: (a > 22 & b LIKE \"sue\") | m < 14",
+        "ploc1: a > 22 & (b LIKE \"sue\" | m < 14)",
+        "ploc1: (a > 22 & b LIKE \"sue\") | ploc2: m < 14",
+        "(ploc1: (a > 22 & b LIKE \"sue\") | ploc2: m < 14) & ploc3: x < 23",
         ]
 
     for query in test_queries:
