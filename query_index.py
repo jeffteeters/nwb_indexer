@@ -310,7 +310,7 @@ def like(pattern, text):
 	# implements LIKE operator.  pattern must be a regular expression, with "%" replaced by .*
 	if isinstance(text, bytes):
 		text = text.decode("utf-8")
-	match = re.fullmatch(pattern, text)
+	match = re.fullmatch(pattern, text, flags=re.DOTALL)
 	found_match = match is not None
 	return found_match
 

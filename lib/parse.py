@@ -54,7 +54,7 @@ grammar = Grammar(
     child_name  = ~r"[\w]+"
     subscript   = ~r"\[[\w]+\]"
     string      = ~r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)"
-    number      = ~r"[0-9]+(\.[0-9]+)?"
+    number      = ~r"-?[0-9]+(\.[0-9]+)?"
     andor       = ("&" / "|")
     lparn       = "("
     rparn       = ")"
