@@ -240,7 +240,7 @@ class Cloc_info_manager:
 		using_index = packed_index_values != ''
 		# if subscript used, extract specified column
 		if have_subscript:
-			subscripts, semicolon, concatenated_columns = sql_ci["value"].partition(";")
+			subscripts, semicolon, concatenated_columns = packed_value.partition("%")
 			available_subscripts = subscripts.split(",")
 			# last character of subscript is type code.  Extract names and type codes
 			available_subscript_types = [x[-1] for x in available_subscripts]

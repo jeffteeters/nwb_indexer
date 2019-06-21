@@ -650,7 +650,7 @@ def format_column(col, node, in_table=False):
 		type_code = 'F'
 	elif isinstance(col[0], h5py.h5r.Reference):
 		fmt = "'" + "','".join([fp[x].name for x in col]) + "'"  # convert reference to name of target
-		type_code = ""
+		type_code = "M" if in_table else "S"
 	elif np.issubdtype(col.dtype, np.integer) or np.issubdtype(col.dtype, np.floating):
 	# elif isinstance(col[0], np.number):
 		fmt = ",".join(["%g" % x.item() for x in col])  # convert to python type
