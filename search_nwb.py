@@ -370,9 +370,11 @@ def runsubquery(cpi, fp, qi, qr):
 		else:
 			zipl = list(zip(*(cvals)))
 			# print("zipl = %s" % zipl)
-			str_filt = "filter( (lambda x: %s), zipl)" % equery
+			# str_filt = "filter( (lambda x: %s), zipl)" % equery
+			efs = "filter( (lambda x: %s), zipl)" % equery  # expression filter string
 			# print("str_filt=%s" % str_filt)
-			result = list(eval(str_filt))
+			# result = list(eval(str_filt))
+			result = list(eval(efs))
 			if len(result) > 0:
 				vtbl_res.set_tbl_result(cnames, result)
 				result = True
