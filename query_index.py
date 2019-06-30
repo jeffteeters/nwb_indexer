@@ -7,6 +7,7 @@ import pprint
 import lib.parse as parse
 import lib.results as results
 import lib.make_sql as make_sql
+import lib.pack_values as pack_values
 
 readline.parse_and_bind('tab: complete')
 pp = pprint.PrettyPrinter(indent=4)
@@ -181,30 +182,111 @@ class Cloc_info_manager:
 		# but the child name in the sql results will never have a subscript.  If the subscript
 		# spqcified on the query (by the user) is not in the value of the SQL query, for ANY of the
 		# query children, store None (since all values are required for the query to match).
+		# First get unpacked values for children that use subscripts and check if subscripts present.
+		# get list of subscripts required.  Store in dictionary of form:
+		# { <child_name>: { 'subscripts': [ <list of subscripts> ], 'unpacked': <unpacked_structure>}
+		referenced_subscripts = {}
+		for query_child in self.qi["plocs"][self.pi]["cloc_parts"]:
+			child, subscript = self.qi["plocs"][self.pi]["cloc_parts"][query_child]
+			if child in referenced_subscripts:
+				if subscript not in referenced_subscripts[child]:
+					referenced_subscripts[child]['subscripts'].append(subscript)
+			else:
+				referenced_subscripts[child] = {'subscripts': [subscript, ]}
+		# now for each child with referenced subscripts, get unpacked values, making sure
+		# referenced subscripts are provided
+		for child in referenced_subscripts:
+			sql_ci = self.sql_children_info[child]
+			assert sql_ci["value_type"] == 'c'
+			# unpack(packed, value_type, required_col_names=None)
+			unpacked = pack_values.unpack(sql_ci["value"], sql_ci["value_type"], 
+				referenced_subscripts[child]['subscripts'])
+			if unpacked_value is None:
+				# a referenced subscript not found, so unable to obtain value for this child
+				self.query_children_info = None
+				return
+			referenced_subscripts[child]['unpacked'] = unpacked
+		# Now have verifified that values are present for all referenced subscripts, get
+		# requested values
 		query_children_info = {}
 		for query_child in self.query_children:
 			# check for subscript on query_child
 			if query_child in self.qi["plocs"][self.pi]["cloc_parts"]:
 				child, subscript = self.qi["plocs"][self.pi]["cloc_parts"][query_child]
+				unpacked = referenced_subscripts[child]['unpacked']
+				assert subscript in unpacked['col_names']
+				subscript_index = unpacked['col_names'].index(subscript)
+				decoded_value = unpacked['cols'][subscript_index]
+				using_index = 'index_values' in unpacked
+				if using_index:
+					decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_values'])
+				sql_ci = self.sql_children_info[child]
+				value_type = sql_ci["value_type"]
+				assert value_type == 'c'
+				# col_type = unpacked['col_types'][subscript_index]
 			else:
+				# this query_child does not have a subscript
 				child = query_child
-				subscript = None
-			sql_ci = self.sql_children_info[child]
-			decoded_value, using_index = self.decode_sql_value(subscript, sql_ci["value"], sql_ci["value_type"])
-			if decoded_value is None:
-				# specified subscript not found, so unable to obtain value for this child
-				self.query_children_info = None
-				return
-			drow = sql_ci["value_type"] in ("I", "F", "c", "M")  # set true if part of dynamic row
+				sql_ci = self.sql_children_info[child]
+				value_type = sql_ci["value_type"]
+				packed_value = sql_ci["value"]
+				# value_type should be anything except 'c'
+				assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'M')
+				if value_type in ('I', 'F', 'S', 'M'):
+					# values are packed
+					unpacked = pack_values.unpack(packed_value, value_type)
+					decoded_value = unpacked['cols'][0]
+					using_index = 'index_values' in unpacked
+					if using_index:
+						decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_values'])
+				else:
+					# value not packed, is either numeric scalar or string
+					using_index = False
+					if value_type in ('i', 'f'):
+						# numeric scalar
+						assert ((value_type == 'i' and isinstance(packed_value, int))
+							or (value_type == 'f' and isinstance(packed_value, float))
+							or (packed_value == 'nan') )
+						decoded_value = [packed_value, ] # return list of one number
+					# should be single string
+					else:
+						assert value_type == 's'
+						assert (isinstance(packed_value, str))
+						decoded_value = [packed_value, ] # return list of one string
+			# done finding decoded_value
+			drow = value_type in ("I", "F", "c", "M")  # set true if part of dynamic row
 			assert sql_ci["node_type"] in ("d", "a")  # should be either attribute or dataset
 			node_type = "attribute" if sql_ci["node_type"] == "a" else "Dataset"
 			query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
 				"node_type": node_type, "using_index": using_index}
 		self.query_children_info = query_children_info
+		# print("self.query_children_info=")
+		# pp.pprint(self.query_children_info)
+
+			# 	decoded_value, using_index = self.decode_sql_value(subscript, sql_ci["value"], sql_ci["value_type"])
+			# 	child = query_child
+			# 	sql_ci = self.sql_children_info[child]
+			# 	unpacked = pack_values.unpack(sql_ci["value"], sql_ci["value_type"])
+			# 	decoded_value = unpacked['cols'][0]
+			# using_index = 'index_values' in unpacked
+			# if using_index:
+			# 	decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_values'])
+
+			# decoded_value, using_index = self.decode_sql_value(subscript, sql_ci["value"], sql_ci["value_type"])
+			# if decoded_value is None:
+			# 	# specified subscript not found, so unable to obtain value for this child
+			# 	self.query_children_info = None
+			# 	return
+		# 	drow = sql_ci["value_type"] in ("I", "F", "c", "M")  # set true if part of dynamic row
+		# 	assert sql_ci["node_type"] in ("d", "a")  # should be either attribute or dataset
+		# 	node_type = "attribute" if sql_ci["node_type"] == "a" else "Dataset"
+		# 	query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
+		# 		"node_type": node_type, "using_index": using_index}
+		# self.query_children_info = query_children_info
 		# print("query_children_info = ")
 		# pp.pprint(self.query_children_info)
 
-	def decode_sql_value(self, subscript, packed_value, value_type):
+	def decode_sql_value_old(self, subscript, packed_value, value_type):
 		# convert packed_value (saved as string in sqlite) into list that can be used directly
 		# for evaluating expression.
 		# subscript is subscript used to access value stored in column of array or None if not
