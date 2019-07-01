@@ -32,41 +32,52 @@ def pack(cols, index_vals = None, col_names = None, in_table = False, node_path=
 		# format an 1-d array of values as a comma separated string
 		# return a tuple of type_code and formatted column
 		# in_table is True if column is in a NWB 2 table, False otherwise
+		def int_type_code():
+			return 'I' if index_vals is None else "J"
+		def float_type_code():
+			return 'F' if index_vals is None else "G"
+		def pack_numeric(col):
+			return delimiter.join(["%g" % x for x in col])
+		def pack_numpy_numeric(col):
+			return delimiter.join(["%g" % x.item() for x in col])  # convert to python type
+
 		assert len(col) > 0, "attempt to format empty column at %s" % node_path
 		if isinstance(col[0], bytes):
 			col = [x.decode("utf-8") for x in col]
-			packed = make_csv(col)
-			type_code = "M" if in_table else "S"
+			packed, type_code = make_csv(col)
 		elif isinstance(col[0], str):
-			packed = make_csv(col)			
-			type_code = "M" if in_table else "S"
+			packed, type_code = make_csv(col)	
 		elif isinstance(col[0], (int, np.integer)):
-			packed = delimiter.join(["%g" % x for x in col])
-			type_code = 'I'
+			packed = pack_numeric(col)
+			type_code = int_type_code()
 		elif isinstance(col[0], (float, np.float)):
-			packed = delimiter.join(["%g" % x for x in col])
-			type_code = 'F'
+			packed = pack_numeric(col)
+			type_code = float_type_code()
+		elif np.issubdtype(col.dtype, np.integer):
+			packed = pack_numpy_numeric(col)
+			type_code = int_type_code()
+		elif np.issubdtype(col.dtype, np.floating):
+			packed = pack_numpy_numeric(col)
+			type_code = float_type_code()
 		elif isinstance(col[0], h5py.h5r.Reference):
 			# convert reference to name of target
 			col = [fp[x].name for x in col]
-			packed = make_csv(col)
-			type_code = "M" if in_table else "S"
-		elif np.issubdtype(col.dtype, np.integer) or np.issubdtype(col.dtype, np.floating):
-		# elif isinstance(col[0], np.number):
-			packed = delimiter.join(["%g" % x.item() for x in col])  # convert to python type
-			type_code = "I" if  np.issubdtype(col.dtype, np.integer) else "F"
+			packed, type_code = make_csv(col)	
 		else:
 			print("pack_column: Unknown type (%s) at %s" % (type(col[0]), node_path))
 			import pdb; pdb.set_trace()
 		return (packed, type_code)
 
 	def make_csv(col):
+		# convert string array to csv, also return string type code
+		assert isinstance(col[0], str)
 		output = io.StringIO()
 		writer = csv.writer(output, delimiter=delimiter, quotechar=quotechar,
 			doublequote = False, escapechar = escapechar, lineterminator='')
 		writer.writerow(col)
 		packed = output.getvalue()
-		return packed
+		str_type_code = "S" if not in_table else "M" if index_vals is None else "B"
+		return (packed, str_type_code)
 
 	# start of main for pack
 	if len(cols) > 1:
@@ -94,7 +105,7 @@ def pack(cols, index_vals = None, col_names = None, in_table = False, node_path=
 		col_info_prefix = "".join(column_types) + index_flag + packed_col_names + delimiter 
 		type_code = "c"
 	else:
-		col_info_prefix = index_flag
+		col_info_prefix = ""
 	packed_values = col_info_prefix + delimiter.join(packed_columns) + index_str
 	return (packed_values, type_code)
 
@@ -105,18 +116,18 @@ def unpack(packed, value_type, required_col_names=None):
 	# 'cols': [ [col1], [col2], ...]
 	# 'col_names': [ col_names, ],
 	# 'col_types': [ type_code, ...]
-	# 'index_values': [... ]
+	# 'index_vals': [... ]
 	# }
 	# or None if any required_subscripts are not present
 	uv = { }  # dict for storing unpacked values
 
 	def convert_column(col, value_type):
 		# convert col values from string to type given in value_type
-		assert value_type in ('I', 'F', 'S', 'M')
-		if value_type == 'I':
+		assert value_type in ('I', "J", 'F', "G", 'S', 'M', "B")
+		if value_type in ('I', "J"):
 			# list of integers
 			value = list(map(int, col))
-		elif value_type == 'F':
+		elif value_type in ('F', "G"):
 			# list of floats
 			value = list(map(float, col))
 		else:
@@ -126,21 +137,22 @@ def unpack(packed, value_type, required_col_names=None):
 
 	# start of main of unpack
 	if value_type == "c":
-		m = re.match("^([MFI]*)([in])", packed)
+		m = re.match("^([MBFGIJ]*)([in])", packed)
 		column_types = m.group(1)
 		num_columns = len(column_types)
 		uv['col_types'] = column_types
 		have_index_values = m.group(2) == "i"
 		csv_start_index = num_columns + 1
 	else:
-		have_index_values = packed[0] == "i"
-		csv_start_index = 1 # skip over i/n (first character)
+		have_index_values = value_type in ("J", "G", "B")
+		csv_start_index = 0
 	if have_index_values:
 		i_index = packed.rfind("i")
+		assert i_index > 0
 		packed_index_values = packed[i_index+1:]
-		uv['index_values'] = list(map(int, packed_index_values.split(',')))
+		uv['index_vals'] = list(map(int, packed_index_values.split(',')))
 		packed = packed[csv_start_index: i_index]
-	else:
+	elif csv_start_index > 0:
 		packed = packed[csv_start_index:]
 	f = io.StringIO(packed)
 	reader = csv.reader(f, delimiter=delimiter, quotechar=quotechar,
@@ -405,7 +417,7 @@ def run_tests():
 		print("cols:")
 		pp.pprint(cols)
 		packed, type_code = pack(cols, index_vals=index_vals, col_names=col_names, in_table=True)
-		print("packed: %s" % packed)
+		print("type_code=%s, packed: %s" % (type_code, packed))
 		unpacked = unpack(packed, type_code)
 		print("unpacked:")
 		pp.pprint(unpacked)

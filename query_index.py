@@ -165,7 +165,7 @@ class Cloc_info_manager:
 			value_type = node_qr[qtype][i+2]
 			value = node_qr[qtype][i+3]
 			# safety check
-			assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'c', 'M')
+			assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'c', 'M', 'J', 'G', 'B')
 			assert node_type in ('g', 'd', 'a', 'G')
 			# assert child_name in children
 			children_info[child_name] = { "node_type": node_type, "value_type": value_type, "value": value }
@@ -217,9 +217,9 @@ class Cloc_info_manager:
 				assert subscript in unpacked['col_names']
 				subscript_index = unpacked['col_names'].index(subscript)
 				decoded_value = unpacked['cols'][subscript_index]
-				using_index = 'index_values' in unpacked
+				using_index = 'index_vals' in unpacked
 				if using_index:
-					decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_values'])
+					decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_vals'])
 				sql_ci = self.sql_children_info[child]
 				value_type = sql_ci["value_type"]
 				assert value_type == 'c'
@@ -231,14 +231,14 @@ class Cloc_info_manager:
 				value_type = sql_ci["value_type"]
 				packed_value = sql_ci["value"]
 				# value_type should be anything except 'c'
-				assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'M')
-				if value_type in ('I', 'F', 'S', 'M'):
+				assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'M', 'J', 'G', 'B')
+				if value_type in ('I', 'F', 'S', 'M', 'J', 'G', 'B'):
 					# values are packed
 					unpacked = pack_values.unpack(packed_value, value_type)
 					decoded_value = unpacked['cols'][0]
-					using_index = 'index_values' in unpacked
+					using_index = 'index_vals' in unpacked
 					if using_index:
-						decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_values'])
+						decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_vals'])
 				else:
 					# value not packed, is either numeric scalar or string
 					using_index = False
@@ -254,7 +254,7 @@ class Cloc_info_manager:
 						assert (isinstance(packed_value, str))
 						decoded_value = [packed_value, ] # return list of one string
 			# done finding decoded_value
-			drow = value_type in ("I", "F", "c", "M")  # set true if part of dynamic row
+			drow = value_type in ("I","F","c","M","J","G","B")  # set true if part of dynamic row
 			assert sql_ci["node_type"] in ("d", "a")  # should be either attribute or dataset
 			node_type = "attribute" if sql_ci["node_type"] == "a" else "Dataset"
 			query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,

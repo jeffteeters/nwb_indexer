@@ -67,10 +67,11 @@ create table node (  -- stores groups, dataseta AND attributes
 
 create table value (			-- value of dataset or attribute
 	id integer primary key,
-	type char(1) not null CHECK( type IN ('i', 'f','s','I', 'F', 'S', 'c','M') ),
+	type char(1) not null CHECK( type IN ('i','f','s','I','J','F','G','S','c','M','B') ),
 		-- either: i-integer, f-float, s-string, I-integer array, F-float array,
 		--		   S-string array, c-compound or 2-d
 		--         M-string array part of table (type 'I', 'F' and 'c' also part of table)
+		--         'J', 'G', 'B' are int, float and string arrays part of table *with* index values
 	nval numeric,		-- contains value of number, if type 'i' or 'f'.  Otherwise, NULL.
 	sval text			-- stores values of type s, I, F, S, c as comma seperated values otherwise NULL
 		-- If type 'c' has list of columns names with column type char at end of each name, then lists
@@ -143,7 +144,7 @@ class Value_mirror:
 
 	def get_id(self, vtype, nval, sval):
 		global cur
-		assert vtype in ('i', 'f', 'I', 'F', 's', 'S', 'c', 'M'), 'value vtype invalid: "%s"' % vtype
+		assert vtype in ('i','f','I','J','F','G','s','S','c','M','B'), 'value vtype invalid: "%s"' % vtype
 		if vtype == 'i':
 			assert (isinstance(nval, int) or nval == "nan") and sval is None, (
 				"value type 'i' not consistent, nval=%s, type=%s, sval=%s, type=%s" %
@@ -512,7 +513,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				return None
 			sval, vtype = pack_values.pack([node.value,], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
-			assert vtype in ("I", "F")
+			assert vtype in ("I", "F", "J", "G")
 			# vtype = "I" if (np.issubdtype(node.dtype, np.integer) or
 			# 	 np.issubdtype(node.dtype, np.dtype(bool).type)) else "F"
 			# vtype = "N"	# N - array of numbers
@@ -529,7 +530,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 						MAX_NWB2_PACKED_STRING_LENGTH, node.name))
 				return None	
 			nval = None
-			assert vtype == "M"
+			assert vtype in ("M", "B")
 		else:
 			vlenType = h5py.check_dtype(vlen=node.dtype)
 			if vlenType in (bytes, str):
@@ -541,7 +542,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				# 	sval = sval.decode("utf-8")
 				# else:
 				# 	sval = "'" + "','".join(vlist) + "'"	# join string
-				assert vtype == "M"
+				assert vtype in ("M", "B")
 				nval = None
 				if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
 					print("Warning: not indexing vlen string array because too large "
