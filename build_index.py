@@ -470,16 +470,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			sval, vtype = pack_values.pack(coldata, index_vals=index_values,
 				 col_names=colnames, in_table=True, node_path=node.name, fp=fp)
 			assert vtype == 'c'
-			# for i in range(node.shape[1]):
-			# 	fmt, type_code = format_column(node[:,i], node, in_table)
-			# 	colnames.append("%i%s" % (i, type_code))
-			# 	coldata.append(fmt)
-			# sval = ','.join(colnames) + "%" + ';'.join(coldata) + index_values
-			# colnames = ','.join([ "%i" % i for i in range(node.shape[1]) ])
-			# coldata = ';'.join(format_column(node[:,i], node) for i in range(node.shape[1]))
-			# sval = colnames + '%' + coldata + index_values
 			nval = None
-			# vtype = 'c'
 		elif len(node.dtype) > 1:
 			# found compound type
 			if node.size * len(node.dtype) > MAX_NWB2_TABLE_SIZE:
@@ -495,13 +486,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				coldata.append(node[cn])
 			sval, vtype = pack_values.pack(coldata, index_vals=index_values,
 				 col_names=colnames, in_table=True, node_path=node.name, fp=fp)
-			# 	fmt, type_code = format_column(node[cn], node, in_table)
-			# 	colnames.append("%s%s" % (cn, type_code))
-			# 	coldata.append(fmt)
-			# sval = ','.join(colnames) + "%" + ';'.join(coldata) + index_values
-			# colnames = ','.join(node.dtype.names)
-			# coldata = ';'.join(format_column(node[cn], node) for cn in node.dtype.names)
-			# sval = colnames + '%' + coldata + index_values
 			nval = None
 			assert vtype == 'c'
 		elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
@@ -514,16 +498,11 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			sval, vtype = pack_values.pack([node.value,], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
 			assert vtype in ("I", "F", "J", "G")
-			# vtype = "I" if (np.issubdtype(node.dtype, np.integer) or
-			# 	 np.issubdtype(node.dtype, np.dtype(bool).type)) else "F"
-			# vtype = "N"	# N - array of numbers
 			nval =  None
-			# sval = ','.join([ "%g" % n for n in node.value ]) + index_values
 		elif np.issubdtype(node.dtype, np.character) or isinstance(node[0], h5py.Reference):
 			# found string dataset or object references (replaced by path to node)
 			sval, vtype = pack_values.pack([node.value,], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
-			# sval = format_column(node.value, node)[0] + index_values
 			if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
 				print("Warning: not indexing string array because too large "
 					"(packed size = %i, limit = %i), at '%s'" % (len(sval),
@@ -536,12 +515,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			if vlenType in (bytes, str):
 				sval, vtype = pack_values.pack([node.value.tolist(),], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
-				# vlist = node.value.tolist()
-				# if isinstance(vlist[0], bytes):
-				# 	sval = b"'" + b"','".join(vlist) + b"'"	# join bytes
-				# 	sval = sval.decode("utf-8")
-				# else:
-				# 	sval = "'" + "','".join(vlist) + "'"	# join string
 				assert vtype in ("M", "B")
 				nval = None
 				if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
@@ -550,7 +523,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 						MAX_NWB2_PACKED_STRING_LENGTH, node.name))
 					# don't save if total length of string longer than a specific length
 					return None
-				# sval += index_values	# append index_values if present
 				nval = None
 				# vtype = "M"
 			else:
@@ -588,12 +560,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			return None
 		else:
 			sval, vtype = pack_values.pack([node.value.tolist(),], node_path=node.name, fp=fp)
-			# vlist = node.value.tolist()
-			# if isinstance(vlist[0], bytes):
-			# 	sval = b"'" + b"','".join(vlist) + b"'"	# join bytes
-			# 	sval = sval.decode("utf-8")
-			# else:
-			# 	sval = "'" + "','".join(vlist) + "'"	# join string
 			if len(sval) > MAX_PACKED_STRING_LENGTH:
 				# don't save if total length of string longer than a specific length
 				return None
@@ -616,12 +582,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				if node.len() > MAX_STRING_ARRAY_LENGTH:
 					return None
 				sval, vtype = pack_values.pack([node.value.tolist(),], node_path=node.name, fp=fp)
-				# vlist = node.value.tolist()
-				# if isinstance(vlist[0], bytes):
-				# 	sval = b"'" + b"','".join(vlist) + b"'"	# join bytes
-				# 	sval = sval.decode("utf-8")
-				# else:
-				# 	sval = "'" + "','".join(vlist) + "'"	# join string
 				nval = None
 				if len(sval) > MAX_PACKED_STRING_LENGTH:
 					# don't save if total length of string longer than a specific length
@@ -639,7 +599,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			value = [fp[n].name for n in node.value]
 			if len(value) > 1:
 				sval, vtype = pack_values.pack([ value, ], node_path=node.name, fp=fp)
-				# sval = "'" + "','".join(value) + "'"
 				if len(sval) > MAX_PACKED_STRING_LENGTH:
 					# don't save if total length of string longer than a specific length
 					return None
@@ -654,37 +613,6 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 	# if makes is here, should be able to get value_id
 	value_id = value_mirror.get_id(vtype, nval, sval)
 	return value_id
-
-def format_column_old(col, node, in_table=False):
-	# format an 1-d array of values as a comma separated string
-	# return a tuple of type_code and formatted column
-	# in_table is True if column is in a NWB 2 table, False otherwise
-	global fp
-	assert len(col) > 0, "attempt to format empty column at %s" % node.name
-	if isinstance(col[0], bytes):
-		fmt = (b"'" + b"','".join(col) + b"'").decode("utf-8")
-		type_code = "M" if in_table else "S"
-	elif isinstance(col[0], str):
-		fmt = "'" + "','".join(col) + "'"
-		type_code = "M" if in_table else "S"
-	elif isinstance(col[0], (int, np.integer)):
-		fmt = ",".join(["%g" % x for x in col])
-		type_code = 'I'
-	elif isinstance(col[0], (float, np.float)):
-		fmt = ",".join(["%g" % x for x in col])
-		type_code = 'F'
-	elif isinstance(col[0], h5py.h5r.Reference):
-		fmt = "'" + "','".join([fp[x].name for x in col]) + "'"  # convert reference to name of target
-		type_code = "M" if in_table else "S"
-	elif np.issubdtype(col.dtype, np.integer) or np.issubdtype(col.dtype, np.floating):
-	# elif isinstance(col[0], np.number):
-		fmt = ",".join(["%g" % x.item() for x in col])  # convert to python type
-		type_code = "I" if  np.issubdtype(col.dtype, np.integer) else "F"
-	else:
-		print("format_column: Unknown type (%s) at %s" % (type(col[0]), node.name))
-		import pdb; pdb.set_trace()
-	return (fmt, type_code)
-
 
 def visit_nodes(fp):
 	# visit all nodes (groups and datasets) in file

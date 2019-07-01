@@ -17,7 +17,6 @@ default_dbname="nwb_index.db"
 con = None     # database connection
 cur = None       # cursor
 
-
 def open_database(db_path):
 	global con, cur
 	# this for development so don't have to manually delete database between every run
@@ -91,7 +90,6 @@ class Cloc_info_manager:
 
 	def get_children_info(self):
 		return self.query_children_info
-
 
 	# methods below are not meant to be called only internally (e.g. are private)
 
@@ -260,106 +258,6 @@ class Cloc_info_manager:
 			query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
 				"node_type": node_type, "using_index": using_index}
 		self.query_children_info = query_children_info
-		# print("self.query_children_info=")
-		# pp.pprint(self.query_children_info)
-
-			# 	decoded_value, using_index = self.decode_sql_value(subscript, sql_ci["value"], sql_ci["value_type"])
-			# 	child = query_child
-			# 	sql_ci = self.sql_children_info[child]
-			# 	unpacked = pack_values.unpack(sql_ci["value"], sql_ci["value_type"])
-			# 	decoded_value = unpacked['cols'][0]
-			# using_index = 'index_values' in unpacked
-			# if using_index:
-			# 	decoded_value = self.make_indexed_lists(decoded_value, unpacked['index_values'])
-
-			# decoded_value, using_index = self.decode_sql_value(subscript, sql_ci["value"], sql_ci["value_type"])
-			# if decoded_value is None:
-			# 	# specified subscript not found, so unable to obtain value for this child
-			# 	self.query_children_info = None
-			# 	return
-		# 	drow = sql_ci["value_type"] in ("I", "F", "c", "M")  # set true if part of dynamic row
-		# 	assert sql_ci["node_type"] in ("d", "a")  # should be either attribute or dataset
-		# 	node_type = "attribute" if sql_ci["node_type"] == "a" else "Dataset"
-		# 	query_children_info[query_child] = {"decoded_value": decoded_value, "drow": drow,
-		# 		"node_type": node_type, "using_index": using_index}
-		# self.query_children_info = query_children_info
-		# print("query_children_info = ")
-		# pp.pprint(self.query_children_info)
-
-	def decode_sql_value_old(self, subscript, packed_value, value_type):
-		# convert packed_value (saved as string in sqlite) into list that can be used directly
-		# for evaluating expression.
-		# subscript is subscript used to access value stored in column of array or None if not
-		# present.
-		# value_type is "c" if subscript needed, otherwise something else
-		# all possible value types are: ('i', 'f', 's','I', 'F', 'S', 'c','M'),
-		# -- either: i-integer, f-float, s-string, I-int array, F-float array,
-		#    S-string array, c-compound or 2-d
-		#    M - string array part of table (type 'I', 'F' and 'c' also part of table)
-		assert value_type in ('i', 'f', 's', 'I', 'F', 'S', 'c', 'M')
-		subscript_needed = value_type == "c"
-		have_subscript = subscript is not None
-		if subscript_needed != have_subscript:
-			# either subscript needed and not present or present and not needed.  In either case
-			# value required (from query) does not match value stored
-			return None
-		# check for numeric scalar
-		if value_type in ('i', 'f'):
-			assert ((value_type == 'i' and isinstance(packed_value, int))
-				or (value_type == 'f' and isinstance(packed_value, float))
-				or (packed_value == 'nan') )
-			value = [packed_value, ] # return list of one number
-			using_index = False
-			return (value, using_index)
-		# check for single string
-		if value_type in ('s'):
-			assert (isinstance(packed_value, str))
-			value = [packed_value, ] # return list of one string
-			using_index = False
-			return (value, using_index)
-		# strip off "_index" values if present
-		packed_value, separator, packed_index_values = packed_value.partition(";i;")
-		using_index = packed_index_values != ''
-		# if subscript used, extract specified column
-		if have_subscript:
-			subscripts, semicolon, concatenated_columns = packed_value.partition("%")
-			available_subscripts = subscripts.split(",")
-			# last character of subscript is type code.  Extract names and type codes
-			available_subscript_types = [x[-1] for x in available_subscripts]
-			available_subscript_names = [x[0:-1] for x in available_subscripts]
-			found_subscript = subscript in available_subscript_names
-			if found_subscript:
-				index = available_subscript_names.index(subscript)
-				type_code = available_subscript_types[index]
-				packed_value = concatenated_columns.split(";")[index]
-			else:
-				# specified subscript not found
-				return None
-			# replace value_type 'c' with type_code obtained from last character of column subscript
-			assert(value_type == 'c')
-			value_type = type_code
-		# unpack packed_values
-		# if value_type == "n":
-		# 	value = list(float(packed_value))
-		# elif value_type == 's':
-		# 	value = [packed_value, ]  # convert to list with one element
-		if value_type == 'I':
-			# list of integers
-			value = list(map(int, packed_value.split(',')))
-		elif value_type == 'F':
-			# list of floats
-			value = list(map(float, packed_value.split(',')))
-		else:
-			# should be array of strings
-			assert packed_value[0] == "'" and packed_value[-1] == "'", (
-				"decode_sql_value: packed value '%s' not string, value_type == '%s'" % (
-					packed_value, value_type))
-			value = packed_value[1:-2].split("','")
-		if using_index:
-			# need to modify list of items using _index values
-			index_values = list(map(int, packed_index_values.split(',')))
-			value = self.make_indexed_lists(value, index_values)
-		return (value, using_index)
 
 	def make_indexed_lists(self, tags, tags_index):
 		# build tags_lists - list of tags in array by ids
@@ -377,10 +275,6 @@ class Cloc_info_manager:
 
 # end of class Cloc_info_manager:
 
-
-# def initialize_editoken(sc, qi):
-# 	# editoken needs to be refreshed for every new node searching
-# 	sc["editoken"] = qi["tokens"].copy()
 
 def make_like_pattern(sql_pattern):
 	# convert SQL like pattern (with "%" as wildcard) to regular expression pattern (with ".*" wildcard)
