@@ -201,7 +201,7 @@ class Cloc_info_manager:
 			# unpack(packed, value_type, required_col_names=None)
 			unpacked = pack_values.unpack(sql_ci["value"], sql_ci["value_type"], 
 				referenced_subscripts[child]['subscripts'])
-			if unpacked_value is None:
+			if unpacked is None:
 				# a referenced subscript not found, so unable to obtain value for this child
 				self.query_children_info = None
 				return
