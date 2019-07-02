@@ -87,6 +87,27 @@ def make_sql(qi, cpi, query_type):
 			is_string = qi["ttypes"][cti+2] == "SC"
 			value_select = "%s.sval" % child_value_alias if is_string else "%s.nval" % child_value_alias
 			editokens[cti] = value_select
+			# check for string constant, make sure has wildcard prefix and suffix for SQL match
+			# replace operator with LIKE if is not like so SQL search will find item
+			if qi["ttypes"][cti+2] == "SC":
+				sc = editokens[cti+2]
+				assert sc[0] in ("'", '"') and sc[-1] == sc[0], "string constant not in quotes: %s" % sc
+				assert len(sc) > 2
+				sc_before = sc
+				if sc[1] != '%':
+					sc = "%s%%%s" % (sc[0], sc[1:])
+				if sc[-2] != "%":
+					sc = "%s%%%s" % (sc[0:-1], sc[-1])
+				# print("sc before: %s, after:%s" % (sc_before, sc))
+				if sc_before != sc:
+					# replace string constant with wildcard version
+					editokens[cti+2] = sc
+				# check if operator is not LIKE
+				op = editokens[cti+1]
+				assert op in ('LIKE','<','>','<=','>=','=='), "invalid operator before string: %s" % op
+				if op != "LIKE":
+					editokens[cti+1] = "LIKE"
+
 			if have_child_value_alias:
 				# now that have edited the tokens, if already processed this child, no need to do anything else
 				# possible todo: check for mismatch in child use, e.g. used as both string and number in expression
@@ -152,9 +173,10 @@ epochs:((start_time>200 & stop_time<250) | (start_time > 1600 & stop_time < 1700
 epochs:(start_time>200 & stop_time<250) | epochs : (start_time > 1600 & stop_time < 1700)
 epochs: start_time>200 & stop_time<250 & /file_create_date LIKE "2017-04"
 epochs: start_time>200 & file_create_date LIKE "2017-04"
+*: colnames
 """
 test_queries = """
-*: colnames
+/epochs/* : tags == 'performing' & tags LIKE "ion trial" & start_time == 2.284463
 """
 
 def main():

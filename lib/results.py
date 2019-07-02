@@ -78,8 +78,28 @@ class Vind_result:
 
 	def add_vind_value(self, cloc, value):
 		# cloc is name of child location, value is the value of that variable
-		# value can be a scalar or a list (if more then one value satisifies the condition)
-		self.vind_result[cloc] = value
+		# store value as scalar if possible (one element), otherwise as list.
+		# Add new values to previously values (make list if not already).
+		assert isinstance(value, list)
+		if cloc not in self.vind_result:
+			if len(value) == 1:
+				# save value as scalar if only one element
+				self.vind_result[cloc] = value[0]
+			else:
+				self.vind_result[cloc] = value
+		elif isinstance(self.vind_result[cloc], list):
+			for val in value:
+				if val not in self.vind_result[cloc]:
+					self.vind_result[cloc].append(val)
+		elif len(value) == 1 and value[0] == self.vind_result[cloc]:
+			# scalar value already stored
+			pass
+		elif self.vind_result[cloc] in value:
+			# scalar is in new value
+			self.vind_result[cloc] = value
+		else:
+			# convert to list and concatenate new list
+			self.vind_result[cloc] = [ self.vind_result[cloc],] + value
 
 	def get_value(self):
 		return self.vind_result
