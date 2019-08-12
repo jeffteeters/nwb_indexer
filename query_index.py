@@ -91,7 +91,7 @@ class Cloc_info_manager:
 	def get_children_info(self):
 		return self.query_children_info
 
-	# methods below are not meant to be called only internally (e.g. are private)
+	# methods below are meant to be called only internally (e.g. are private)
 
 	def compute_sql_query_results(self):
 		# gets results of sql query for ALL plocs (parent locations).  Saves in self.sqr
@@ -116,7 +116,6 @@ class Cloc_info_manager:
 							"node_type": node_type, result_type: row[4:] } )
 		# start of main body of get_sql_query_results
 		qi = self.qi
-		# sql_maker = make_sql.SQL_maker(qi)
 		# sqr - for storing sub query results.  Format is:
 		# { file_id: { "file_name": <file_name>, "sq": [ <sq0_results>, <sq1_results>, ... ]}
 		# where <sqN_results> is [ <node1>, <node2>, <node3> ...  ]

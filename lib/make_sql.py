@@ -174,9 +174,10 @@ epochs:(start_time>200 & stop_time<250) | epochs : (start_time > 1600 & stop_tim
 epochs: start_time>200 & stop_time<250 & /file_create_date LIKE "2017-04"
 epochs: start_time>200 & file_create_date LIKE "2017-04"
 *: colnames
+/epochs/* : tags == 'performing' & tags LIKE "ion trial" & start_time == 2.284463
 """
 test_queries = """
-/epochs/* : tags == 'performing' & tags LIKE "ion trial" & start_time == 2.284463
+general/subject: species == "mouse"
 """
 
 def main():
