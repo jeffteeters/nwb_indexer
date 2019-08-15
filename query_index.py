@@ -241,9 +241,15 @@ class Cloc_info_manager:
 					using_index = False
 					if value_type in ('i', 'f'):
 						# numeric scalar
-						assert ((value_type == 'i' and isinstance(packed_value, int))
-							or (value_type == 'f' and isinstance(packed_value, float))
-							or (packed_value == 'nan') )
+						if isinstance(packed_value, int):
+							if value_type == 'f':
+								# when possible sqlite3 stores floats as int, convert to float
+								packed_value = float(packed_value)
+						else:
+							# packed_value not int, should be either float or nan
+							assert (value_type == 'f' and (isinstance(packed_value, float)
+							    or packed_value == 'nan')), ("mismatch: value_type=%s, packed_value=%s (%s)" %
+							(value_type, packed_value, type(packed_value)))
 						decoded_value = [packed_value, ] # return list of one number
 					# should be single string
 					else:

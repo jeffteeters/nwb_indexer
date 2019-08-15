@@ -277,7 +277,7 @@ def runsubquery(cpi, fp, qi, qr):
 				value = node[main][subscript]
 		else:
 			# no subscript, load value directly
-			value = node[child].value
+			value = node[child][()]  # was dataset.value; depreciated, use dataset[()] instead
 		# assert len(value) > 0, "Empty value found: %s, %s" % (node.name, child) 
 		value = convert_to_list(value)
 		if len(value) > 0 and isinstance(value[0], h5py.h5r.Reference):
@@ -317,7 +317,7 @@ def runsubquery(cpi, fp, qi, qr):
 				if child_index in node:
 					if not isinstance(node[child_index], h5py.Dataset):
 						sys.exit("Node %s is not a Dataset, should be since has '_index' suffix" % child_index);
-					index_vals = node[child_index].value;
+					index_vals = node[child_index][()]  # was dataset.value; depreciated, use dataset[()] instead
 					value = make_indexed_lists(value, index_vals)
 					# print("child=%s, after indexed vals=%s" % (child, value))
 					made_by_index.append(child)

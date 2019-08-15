@@ -271,7 +271,7 @@ def save_group(node, parent_id):
 
 def save_node_attributes(node, node_id):
 	# save attributes for group or dataset
-	for key in node.attrs:
+	for key in sorted(node.attrs):
 		value = node.attrs[key]
 		save_attribute(node_id, key, value, node.name + "-" + key)
 
@@ -448,9 +448,8 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			assert np.issubdtype(index_dataset.dtype, np.integer), "_index dataset is not integer (%s): %s" % (
 				index_dataset.dtype, index_dataset.name)
 			assert len(index_dataset.shape) == 1, "_index dataset should be 1-d: %s" % index_dataset.name
-			# create string for storing index values, separated from other values by ';i;'
-			# index_values = ";i;" + ",".join(["%i" % x for x in index_dataset.value])
-			index_values = index_dataset.value
+			# will create string for storing index values, separated from other values by 'i'
+			index_values = index_dataset[()]  # was dataset.value which is depreciated
 		else:
 			# index_values = ""
 			index_values = None
@@ -495,13 +494,13 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				print('Warning: not indexing numeric array because too big (size=%i, limit=%i), at %s' %
 				 (node.size, MAX_NWB2_TABLE_SIZE, node.name))
 				return None
-			sval, vtype = pack_values.pack([node.value,], index_vals=index_values,
+			sval, vtype = pack_values.pack([node[()],], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
 			assert vtype in ("I", "F", "J", "G")
 			nval =  None
 		elif np.issubdtype(node.dtype, np.character) or isinstance(node[0], h5py.Reference):
 			# found string dataset or object references (replaced by path to node)
-			sval, vtype = pack_values.pack([node.value,], index_vals=index_values,
+			sval, vtype = pack_values.pack([node[()],], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
 			if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
 				print("Warning: not indexing string array because too large "
@@ -513,7 +512,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 		else:
 			vlenType = h5py.check_dtype(vlen=node.dtype)
 			if vlenType in (bytes, str):
-				sval, vtype = pack_values.pack([node.value.tolist(),], index_vals=index_values,
+				sval, vtype = pack_values.pack([node[()].tolist(),], index_vals=index_values,
 				 in_table=True, node_path=node.name, fp=fp)
 				assert vtype in ("M", "B")
 				nval = None
@@ -534,10 +533,10 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 		# found numeric dataset
 		if node.size == 1:
 			if np.issubdtype(node.dtype, np.integer) or np.issubdtype(node.dtype, np.dtype(bool).type):
-				nval = int(node[()]) if scalar else int(node.value[0])
+				nval = int(node[()]) if scalar else int(node[()][0])
 				vtype = "i"
 			else:
-				nval = float(node[()]) if scalar else float(node.value[0])
+				nval = float(node[()]) if scalar else float(node[()][0])
 				vtype = "f"
 			if math.isnan(nval):
 				nval="nan"
@@ -559,7 +558,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			# don't save if more than 20 elements in string array
 			return None
 		else:
-			sval, vtype = pack_values.pack([node.value.tolist(),], node_path=node.name, fp=fp)
+			sval, vtype = pack_values.pack([node[()].tolist(),], node_path=node.name, fp=fp)
 			if len(sval) > MAX_PACKED_STRING_LENGTH:
 				# don't save if total length of string longer than a specific length
 				return None
@@ -581,7 +580,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			else:
 				if node.len() > MAX_STRING_ARRAY_LENGTH:
 					return None
-				sval, vtype = pack_values.pack([node.value.tolist(),], node_path=node.name, fp=fp)
+				sval, vtype = pack_values.pack([node[()].tolist(),], node_path=node.name, fp=fp)
 				nval = None
 				if len(sval) > MAX_PACKED_STRING_LENGTH:
 					# don't save if total length of string longer than a specific length
@@ -596,7 +595,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 		elif not scalar and isinstance(node[0], h5py.Reference):
 			# print ("found dataset array object reference in dataset at %s" % node.name)
 			nval = None
-			value = [fp[n].name for n in node.value]
+			value = [fp[n].name for n in node[()]]
 			if len(value) > 1:
 				sval, vtype = pack_values.pack([ value, ], node_path=node.name, fp=fp)
 				if len(sval) > MAX_PACKED_STRING_LENGTH:
@@ -624,7 +623,7 @@ def visit_nodes(fp):
 		node, parent_id, parent_node = to_visit.pop(0)
 		node_id = get_node_id(node, parent_id, parent_node)
 		if isinstance(node,h5py.Group):
-			for child in node:
+			for child in sorted(node):
 				try:
 					cn = node[child]
 				except:
