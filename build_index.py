@@ -341,7 +341,7 @@ def get_value_id_from_attribute(value, attribute_path):
 				or np.issubdtype(value.dtype, np.float)), (
 				"type is: %s" % value.dtype)
 			vtype = 'f' if isinstance(value.dtype, np.float) else 'i'
-		elif np.issubdtype(value.dtype, np.character):
+		elif np.issubdtype(value.dtype, np.character) or isinstance(value.dtype, object):
 			# found array of strings
 			assert isinstance(value[0], bytes), "expecting string value bytes, found %s (%s) at %s " % (
 			value, type(value), attribute_path)
@@ -371,7 +371,7 @@ def get_value_id_from_attribute(value, attribute_path):
 				sval = value[0]
 				vtype = 's'
 		else:
-			print("unknown type %s value %s at %s" % type(value[0]), value[0], attribute_path)
+			print("unknown type %s value %s at %s" % (type(value[0]), value[0], attribute_path))
 			import pdb; pdb.set_trace()
 			return None
 	elif isinstance(value, np.generic):
@@ -445,8 +445,8 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 		index_name = base_name + "_index"
 		if index_name in parent_node:
 			index_dataset = parent_node[index_name]
-			assert np.issubdtype(index_dataset.dtype, np.integer), "_index dataset is not integer (%s): %s" % (
-				index_dataset.dtype, index_dataset.name)
+			assert np.issubdtype(index_dataset.dtype, np.integer) or np.issubdtype(index_dataset.dtype, np.float), ( 
+				"_index dataset is not integer or float (%s): %s") % (index_dataset.dtype, index_dataset.name)
 			assert len(index_dataset.shape) == 1, "_index dataset should be 1-d: %s" % index_dataset.name
 			# will create string for storing index values, separated from other values by 'i'
 			index_values = index_dataset[()]  # was dataset.value which is depreciated
@@ -649,7 +649,7 @@ def scan_file(path):
 	fp.close()
 
 def scan_directory(dir):
-	for root, dirs, files in os.walk(dir):
+	for root, dirs, files in os.walk(dir, followlinks=True):
 		for file in files:
 			if file.endswith("nwb"):
 				scan_file(os.path.join(root, file))

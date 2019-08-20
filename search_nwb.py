@@ -421,7 +421,7 @@ def query_file(path, qi):
 def query_directory(dir, qi):
 	# must find files to query.  dir must be a directory
 	assert os.path.isdir(dir)
-	for root, dirs, files in os.walk(dir):
+	for root, dirs, files in os.walk(dir, followlinks=True):
 		for file in files:
 			if file.endswith("nwb"):
 				path = os.path.join(root, file)

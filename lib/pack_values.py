@@ -39,6 +39,8 @@ def pack(cols, index_vals = None, col_names = None, in_table = False, node_path=
 			return delimiter.join(["%g" % x for x in col])
 		def pack_numpy_numeric(col):
 			return delimiter.join(["%g" % x.item() for x in col])  # convert to python type
+		def pack_numpy_bool(col):
+			return delimiter.join(["1" if x else "0" for x in col])
 
 		assert len(col) > 0, "attempt to format empty column at %s" % node_path
 		if isinstance(col[0], bytes):
@@ -61,7 +63,10 @@ def pack(cols, index_vals = None, col_names = None, in_table = False, node_path=
 		elif isinstance(col[0], h5py.h5r.Reference):
 			# convert reference to name of target
 			col = [fp[x].name for x in col]
-			packed, type_code = make_csv(col)	
+			packed, type_code = make_csv(col)
+		elif np.issubdtype(col.dtype, np.bool_):
+			packed = pack_numpy_bool(col)
+			type_code = int_type_code()
 		else:
 			print("pack_column: Unknown type (%s) at %s" % (type(col[0]), node_path))
 			import pdb; pdb.set_trace()
