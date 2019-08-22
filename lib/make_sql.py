@@ -104,7 +104,7 @@ def make_sql(qi, cpi, query_type):
 					editokens[cti+2] = sc
 				# check if operator is not LIKE
 				op = editokens[cti+1]
-				assert op in ('LIKE','<','>','<=','>=','=='), "invalid operator before string: %s" % op
+				assert op in ('LIKE','<','>','<=','>=','==', '!='), "invalid operator before string: %s" % op
 				if op != "LIKE":
 					editokens[cti+1] = "LIKE"
 
@@ -178,6 +178,8 @@ epochs: start_time>200 & file_create_date LIKE "2017-04"
 """
 test_queries = """
 general/subject: species == "mouse"
+*:(neurodata_type == "RoiResponseSeries")
+units: (id > -1 & location == "CA3" & quality > 0.8)
 """
 
 def main():

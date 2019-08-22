@@ -39,14 +39,14 @@ create table name (			-- name (last component of path) of hdf5 entities.  Used t
 	id integer primary key,
 	name text not null
 );
--- create index name_idx on name(name);  -- not sure if this helps
+create index name_idx on name(name);  -- not sure if this helps.  Yes it does, if used with node name_id_idx
 
 create table path (  -- paths listed explicitly.  Used to search for 'parent' entities specified in query.
   id integer primary key,
   path text not null  -- full path, without leading '/'
 );
 
--- create index path_idx on path(name);  -- not sure if this helps
+create index path_idx on path(path);  -- not sure if this helps
 
 create table file (				-- hdf5 files
 	id integer primary key,
@@ -64,6 +64,12 @@ create table node (  -- stores groups, dataseta AND attributes
 	value_id integer references value	-- value associated with dataset or attribute.
 		-- NULL if group or if value is not saved (e.g., numeric arrays not part of a table)
 );
+
+
+create index node_name_id_idx on node(name_id);  -- not sure if this helps.  YES it does!
+create index value_id_idx on node(value_id);  -- not sure if this helps
+create index parent_id_idx on node(parent_id); -- not sure if this helps.  Yes, makes huge difference!
+
 
 create table value (			-- value of dataset or attribute
 	id integer primary key,
