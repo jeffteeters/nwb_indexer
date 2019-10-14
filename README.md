@@ -1,4 +1,12 @@
-# nwbindexer
+# nwb_indexer and search_nwb
+
+This repository contains two tools for searching NWB files (both within a single NWB file,
+and also a collction of NWB files).  The tools are:
+
+* nwb_indexer - builds an SQLite database containing metadata withing an 
+
+
+
 Creates an sqlite index of metadata in a collection of NWB (HDF5) files files.  Also allows searching the
 files using a query syntax similar to that used in the NWB Query Engine.
 These tools were developed for searching within NWB files.
