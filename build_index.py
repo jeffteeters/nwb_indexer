@@ -656,7 +656,7 @@ def scan_file(path):
 
 def scan_directory(dir):
 	for root, dirs, files in os.walk(dir, followlinks=True):
-		for file in files:
+		for file in sorted(files):
 			if file.endswith("nwb"):
 				scan_file(os.path.join(root, file))
 
