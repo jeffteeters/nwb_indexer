@@ -37,8 +37,10 @@ created "nwb_indexer" directory).
 
 ### Testing the installation
 
-To be sure the installation was successful, first download the following NWB files at figshare.com and store
-them in a directory "test_data" which is inside the "nwb_indexer" directory.
+To be sure the installation was successful, first create a directory named "test_data" inside the
+"nwb_indexer" directory, e.g. ```cd nwb_indexer```, ```mkdir test_data```.  Then download the
+following NWB files from figshare.com and store
+them inside the "test_data" directory.
 
 
 * https://doi.org/10.6084/m9.figshare.9627803.v1 (File EC9_B15.nwb - 532.3 MB)
@@ -54,8 +56,6 @@ python run_tests.py
 
 Final line displayed shoud be "All tests passed."  If the test didn't pass, examine
 the displayed output to determine what is wrong.
-
-```
 
 
 ## nwb_indexer usage:
