@@ -1,15 +1,17 @@
 # nwb_indexer and search_nwb
 
-This repository contains two tools for searching NWB files (both within a single NWB file,
-and also a collction of NWB files).  The tools are:
+This repository contains two tools for searching within NWB (HDF5) files:
 
-* nwb_indexer - builds an SQLite database containing metadata withing an 
+* nwb_indexer - builds an SQLite database containing metadata in
+  a collection of NWB files and and allows searching the metadata in the database.
+* search_nwb.py - searches within one or more NWB files by reading
+  the files directly.
 
+A related third tool is the NWB Query Engine.  It is at:
+https://github.com/jezekp/NwbQueryEngine .  The two tools in this repository
+use a query syntax similar to the one used in the NWB
+Query Engine (but with some extensions). Examples queries are given below.
 
-
-Creates an sqlite index of metadata in a collection of NWB (HDF5) files files.  Also allows searching the
-files using a query syntax similar to that used in the NWB Query Engine.
-These tools were developed for searching within NWB files.
 
 ## Requirements:
 Python 3.7
@@ -21,7 +23,42 @@ Can be installed using:
 
 `pip install parsimonious`
 
-## Usage:
+
+## Installation
+
+Download the repository using:
+
+```git clone https://github.com/jeffteeters/nwb_indexer.git```
+
+
+(No further steps are needed.  Once downloaded, the tools can be run by specifying the path to the tool inside the
+created "nwb_indexer" directory).
+
+
+### Testing the installation
+
+To be sure the installation was successful, first download the following NWB files at figshare.com and store
+them in a directory "test_data" which is inside the "nwb_indexer" directory.
+
+
+* https://doi.org/10.6084/m9.figshare.9627803.v1 (File EC9_B15.nwb - 532.3 MB)
+* https://doi.org/10.6084/m9.figshare.9273050.v1 (File GP31_B21.nwb - 1.15 GB)
+
+
+If necessary, use the terminal "cd" command to change directories to be directly inside
+the "nwb_indexer" directory, then run script "run_tests.py" by typing:
+
+```
+python run_tests.py
+```
+
+Final line displayed shoud be "All tests passed."  If the test didn't pass, examine
+the displayed output to determine what is wrong.
+
+```
+
+
+## nwb_indexer usage:
 
 ### 1) Build the index.
 
@@ -52,6 +89,9 @@ which allows entering multiple queries interactively.
 
 
 Queries are specified using the format described in the NWB Query Engine paper, with the following possible exceptions:
+
+
+
 * Wildcards (*) in the parent location must be specified explicitly, otherwise an absolute location is assumed.
 * Values to be displayed can be specified by a list of child names separated by comma's before the expression.
 * String constants must always be enclosed in either single or doulble quotes.  (I think, need to test both single and double quotes).
