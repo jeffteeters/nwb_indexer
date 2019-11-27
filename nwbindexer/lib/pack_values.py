@@ -249,7 +249,7 @@ def time_test():
 	from io import StringIO
 	import csv
 	col_names = "col1M,col2M,col3M,col4M,col5M"
-	col_pat = ','.join(["sue,mary\'s,'mark;\s'," + '"tom,mary",Jeff\'sM,kathryn' for i in range(50)])
+	col_pat = ','.join(["sue,mary's,'mark's;'," + '"tom,mary",Jeff\'sM,kathryn' for i in range(50)])
 	# packed = col_names + ';' + ';'.join(col_pat for i in range(5))
 	packed = ','.join(col_pat for i in range(5))
 	value_type = 'S'

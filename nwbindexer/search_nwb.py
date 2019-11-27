@@ -5,8 +5,8 @@ import numpy as np
 import pprint
 import readline
 import re
-import lib.parse as parse
-import lib.results as results
+import nwbindexer.lib.parse as parse
+import nwbindexer.lib.results as results
 
 # Tool or searching NWB files, both version 1 and 2.
 #

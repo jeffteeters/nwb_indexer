@@ -51,7 +51,8 @@ def check_build_index():
 		remove_index_file()
 		print("previous '%s' removed." % index_file)
 	# cmd = "python " + os.path.join("..", "build_index.py") + " " + os.path.join("..", "test_data")
-	cmd = "python " + os.path.join("..", "build_index.py") + " ./"
+	# cmd = "python " + os.path.join("..", "build_index.py") + " ./"
+	cmd = "python -m nwbindexer.build_index ./"
 	expected_output = """Creating database 'nwb_index.db'
 scanning directory ./
 Scanning file 1: ./ecephys_example.nwb
@@ -64,7 +65,7 @@ query2 = '"general/extracellular_ephys/tetrode1: location LIKE \'%hippocampus\'"
 
 def check_query_index():
 	global query1, query2
-	cmd = "python " + os.path.join("..", "query_index.py") + ' - ' + query1
+	cmd = "python -m nwbindexer.query_index - " + query1
 	expected_output = """Opening 'nwb_index.db'
 Found 1 matching files:
 [   {   'file': './ophys_example.nwb',
@@ -73,7 +74,7 @@ Found 1 matching files:
                                   'vtbl': {}}]]}]
 """
 	run_command(cmd, expected_output)
-	cmd = "python " + os.path.join("..", "query_index.py") + ' - ' + query2
+	cmd = "python -m nwbindexer.query_index - " + query2
 	expected_output = """Opening 'nwb_index.db'
 Found 1 matching files:
 [   {   'file': './ecephys_example.nwb',
@@ -87,7 +88,7 @@ Found 1 matching files:
 def check_search_nwb():
 	global query1, query2
 	# cmd = "python " + os.path.join("..", "search_nwb.py") + " " + os.path.join("..", "test_data") + " " + query1
-	cmd = "python " + os.path.join("..", "search_nwb.py") + " ./ " + query1
+	cmd = "python -m nwbindexer.search_nwb ./ " + query1
 	expected_output = """Found 1 matching files:
 [   {   'file': './ophys_example.nwb',
         'subqueries': [   [   {   'node': '/general/optophysiology/my_imgpln',
@@ -96,7 +97,7 @@ def check_search_nwb():
 """
 	run_command(cmd, expected_output)
 	# cmd = "python " + os.path.join("..", "search_nwb.py") + " " + os.path.join("..", "test_data") + " " + query2
-	cmd = "python " + os.path.join("..", "search_nwb.py") + " ./ " + query2
+	cmd = "python -m nwbindexer.search_nwb ./ " + query2
 	expected_output = """Found 1 matching files:
 [   {   'file': './ecephys_example.nwb',
         'subqueries': [   [   {   'node': '/general/extracellular_ephys/tetrode1',

@@ -4,10 +4,10 @@ import sqlite3
 import re
 import readline
 import pprint
-import lib.parse as parse
-import lib.results as results
-import lib.make_sql as make_sql
-import lib.pack_values as pack_values
+import nwbindexer.lib.parse as parse
+import nwbindexer.lib.results as results
+import nwbindexer.lib.make_sql as make_sql
+import nwbindexer.lib.pack_values as pack_values
 
 readline.parse_and_bind('tab: complete')
 pp = pprint.PrettyPrinter(indent=4)

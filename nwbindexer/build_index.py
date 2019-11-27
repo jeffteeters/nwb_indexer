@@ -4,10 +4,10 @@ import h5py
 import sqlite3
 import numpy as np
 import math
-import lib.pack_values as pack_values
+import nwbindexer.lib.pack_values as pack_values
 
 # global variables
-dbname="nwb_index.db"  # default database name
+default_dbname="nwb_index.db"  # default database name
 con = None     # database connection
 cur = None     # database cursor
 file_id = None # id of current file (id of row in sqlite2 "file" table)
@@ -92,34 +92,34 @@ create index sval_idx on value(sval) where type = 's';
 
 
 class Cache:
-  # cache map of value to id
-  # used to speedup creation of name and path table
-  def __init__(self, table_name, value_name):
-    # maps values to id
-    self.map = {}
-    self.table_name = table_name
-    self.value_name = value_name
-    self.load_map()
+	# cache map of value to id
+	# used to speedup creation of name and path table
+	def __init__(self, table_name, value_name):
+		# maps values to id
+		self.map = {}
+		self.table_name = table_name
+		self.value_name = value_name
+		self.load_map()
 
-  def get_id(self, value):
-    # get id corresponding to value (which must be a string). Will add value to map if not present
-    assert isinstance(value, str)
-    if value in self.map:
-      key = self.map[value]  # key is the id
-    else:
-      key = len(self.map) + 1
-      cur.execute("insert into %s (id, %s) values (?, ?)" % (self.table_name, self.value_name), (key, value))
-      self.map[value] = key  # save indicator if record is new
-    return key
+	def get_id(self, value):
+		# get id corresponding to value (which must be a string). Will add value to map if not present
+		assert isinstance(value, str)
+		if value in self.map:
+			key = self.map[value]  # key is the id
+		else:
+			key = len(self.map) + 1
+			cur.execute("insert into %s (id, %s) values (?, ?)" % (self.table_name, self.value_name), (key, value))
+			self.map[value] = key  # save indicator if record is new
+		return key
 
-  def load_map(self):
-    # load values from table.  Needed if updating database
-    global con, cur
-    assert len(self.map) == 0, "load_map for table '%s' called, but map not empty" % self.table_name
-    result = cur.execute("select id, %s from %s order by %s" % (self.value_name, self.table_name, self.value_name))
-    for row in result:
-      key, value = row
-      self.map[value] = key  # save indicator that record is already in database
+	def load_map(self):
+		# load values from table.  Needed if updating database
+		global con, cur
+		assert len(self.map) == 0, "load_map for table '%s' called, but map not empty" % self.table_name
+		result = cur.execute("select id, %s from %s order by %s" % (self.value_name, self.table_name, self.value_name))
+		for row in result:
+			key, value = row
+			self.map[value] = key  # save indicator that record is already in database
 
 class Value_mirror:
 	# used for quick lookups of values in value table when building index
@@ -199,22 +199,22 @@ class Value_mirror:
 # maps the node id to the list of columns obtained from the "colnames" attribute.
 groups_with_colnames_attribute = {}
 
-def open_database():
-	global dbname, schema
+def open_database(db_path):
+	global schema
 	global con, cur
 	# for testing
 	# if os.path.isfile(dbname):
 	# 	print("removing previous database %s" % dbname)
 	# 	os.remove(dbname)
-	if not os.path.isfile(dbname):
-		print("Creating database '%s'" % dbname)
-		con = sqlite3.connect(dbname)
+	if not os.path.isfile(db_path):
+		print("Creating database '%s'" % db_path)
+		con = sqlite3.connect(db_path)
 		cur = con.cursor()
 		cur.executescript(schema);
 		con.commit()
 	else:
-		print("Opening existing database: %s" % dbname)
-		con = sqlite3.connect(dbname)
+		print("Opening existing database: %s" % db_path)
+		con = sqlite3.connect(db_path)
 		cur = con.cursor()
 
 def initialize_caches():
@@ -661,17 +661,33 @@ def scan_directory(dir):
 				scan_file(os.path.join(root, file))
 
 def main():
-	global con, value_mirror
-	if len(sys.argv) < 2:
-		sys.exit('Usage: %s <directory_name>' % sys.argv[0])
+	global con, value_mirror, default_dbname
+	num_parameters = len(sys.argv)
+	if num_parameters < 2 or num_parameters > 3:
+		print('Usage: %s <directory_name> [ <index_file> ]' % sys.argv[0])
+		print("Where:")
+		print("    <directory_name> - name of directory to scan for nwb files")
+		print("    <index_name> - path to index file:")
+		print("         If nothing specified, uses '%s' in the current directory" % default_dbname)
+		print("         If only a directory specifed, uses '%s' in the specified directory" % default_dbname)
+		sys.exit()
 	if not os.path.isdir(sys.argv[1]):
 		sys.exit('ERROR: directory %s was not found!' % sys.argv[1])
 	dir = sys.argv[1]
-	open_database()
+	if num_parameters == 3:
+		if os.path.isdir(sys.argv[2]):
+			# directory specified, use default_dbname inside directory
+			db_path = os.path.join(sys.argv[2], default_dbname)
+		else:
+			# file specified, use as dbname
+			db_path = sys.argv[2]
+	else:
+		db_path = default_dbname
+	open_database(db_path)
 	initialize_caches()
 	print ("scanning directory %s" % dir)
 	scan_directory(dir)
 	con.close()
 
 if __name__ == "__main__":
-    main()
+	main()

@@ -10,7 +10,7 @@ This repository contains two tools for searching within NWB (HDF5) files:
 A related third tool is the NWB Query Engine.  It is at:
 https://github.com/jezekp/NwbQueryEngine .  The two tools in this repository
 use a query syntax similar to the one used in the NWB
-Query Engine (but with some extensions). Examples queries are given below.
+Query Engine.
 
 
 ## Requirements:
@@ -29,6 +29,13 @@ Can be installed using:
 Download the repository using:
 
 ```git clone https://github.com/jeffteeters/nwb_indexer.git```
+
+
+Then install using:
+
+```python setup.py install```
+
+
 
 
 (No further steps are needed.  Once downloaded, the tools can be run by specifying the path to the tool inside the
@@ -58,11 +65,27 @@ Final line displayed shoud be "All tests passed."  If the test didn't pass, exam
 the displayed output to determine what is wrong.
 
 
+
 ## nwb_indexer usage:
 
 ### 1) Build the index.
 
-First, build the index by running:
+First, build the index by entering either:
+
+`build_index <directory>`
+
+The above form using a command-line utility installed.
+
+or
+
+`python -m nwbindexer.build_index <directory>`
+
+
+The above runs the command by specifying the package containing the build_index utility.
+
+
+
+
 
 `python build_index.py <directory>`
 

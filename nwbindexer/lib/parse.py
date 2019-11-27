@@ -58,7 +58,7 @@ grammar = Grammar(
     andor       = ("&" / "|")
     lparn       = "("
     rparn       = ")"
-    ws          = ~"\s*"
+    ws          = ~r"\s*"
     """)
 
 #     string      = ~r'"[^"]*"'
