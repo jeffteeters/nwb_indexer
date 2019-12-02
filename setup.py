@@ -14,11 +14,14 @@ setuptools.setup(
     url="https://github.com/jeffteeters/nwbindexer",
     # packages=setuptools.find_packages(),
     packages = ["nwbindexer", "nwbindexer.lib", "nwbindexer.test"],
+    package_data={
+        'nwbindexer.test': ['*.nwb'],
+    },
     entry_points={
         'console_scripts': [
             'search_nwb = nwbindexer.search_nwb:main',
-            'build_index = nwbindexer.build_index:main',
-            'query_index = nwbindexer.query_index:main',
+            'build_nwbindex = nwbindexer.build_index:main',
+            'query_nwbindex = nwbindexer.query_index:main',
         ],
     },
     classifiers=[
