@@ -7,12 +7,18 @@ import pytest
 import sys
 import subprocess
 import shutil
-
+import importlib
 
 test_data_dir = os.path.dirname(__file__)  # should be ".../nwbindexer/test"
 file1_path = os.path.join(test_data_dir, "ecephys_example.nwb")
 file2_path = os.path.join(test_data_dir, "ophys_example.nwb")
 index_file = "nwb_index.db"
+
+def test_parsimonious_installed():
+	parsimonious_spec = importlib.util.find_spec("parsimonious")
+	parsimonious_installed = parsimonious_spec is not None
+	assert parsimonious_installed is True
+
 
 # create temporary directory to use for storing test index file.  Based on:
 # https://stackoverflow.com/questions/25525202/py-test-temporary-folder-for-the-session-scope
@@ -35,7 +41,8 @@ def run_command(cmd):
 	print("> %s" % cmd)
 	p = subprocess.run(cmd, shell=True, capture_output=True)
 	output = p.stdout.decode("utf-8").replace("\r", "")  # strip ^M characters (line return) from windows output
-	return output
+	error = p.stderr.decode("utf-8").replace("\r", "")
+	return output + error
 
 def test_build_index(tmpdir_module):
 	global test_data_dir, index_file, file1_path, file2_path
