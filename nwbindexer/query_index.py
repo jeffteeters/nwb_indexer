@@ -558,19 +558,29 @@ def main():
 	global default_dbname, con
 	arglen = len(sys.argv)
 	if arglen < 2 or arglen > 3:
-		print("Usage: python %s <db_path> [ <query> ]" % sys.argv[0])
-		print(" <path> = path to sqlite3 database file or '-' for default database (%s)" % default_dbname)
-		print(" <query> = query to execute (optional).  If present, must be quoted.")
+		print("Usage: python %s <index_path> [ <query> ]" % sys.argv[0])
+		print("where:")
+		print("    <index_path> = path to sqlite3 database file or '-' for default database (%s)" % default_dbname)
+		print("                   if is a directory, then use default database (%s) in that directory." % default_dbname)
+		print("    <query> = query to execute (optional).  If present, must be quoted.  If not present, interactive")
+		print("              mode is used which allows entering multiple queries interactively.")
 		sys.exit("")
-	db_path = sys.argv[1]
+	specified_db_path = sys.argv[1]
 	query = sys.argv[2] if arglen == 3 else None
-	if db_path == "-":
+	if specified_db_path == "-":
 		db_path = default_dbname
-		if not query:
-			# only display message if query not specified in command line
-			print("Using default path: '%s'" % db_path)
+		show_dbpath = True
+	elif os.path.isdir(specified_db_path):
+		db_path = os.path.join(specified_db_path, default_dbname)
+		show_dbpath = True
+	else:
+		db_path = specified_db_path
+		show_dbpath = False
 	if not os.path.exists(db_path):
 		sys.exit("ERROR: database '%s' was not found!" % db_path)
+	if show_dbpath:
+		# only display message if query not specified in command line
+		print("Using index_path: '%s'" % db_path)
 	open_database(db_path)
 	process_command_line(query)
 	con.close()

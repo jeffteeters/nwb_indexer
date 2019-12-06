@@ -7,7 +7,7 @@ setuptools.setup(
     name="nwbindexer",
     version="0.1.0",
     author="Jeff Teeters",
-    author_email="jteeters@berkeley.edu",
+    author_email="jeff@teeters.us",
     description="Two tools for searching NWB files",
     long_description=long_description,
     long_description_content_type="text/markdown",

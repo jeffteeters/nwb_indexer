@@ -91,7 +91,9 @@ def pack(cols, index_vals = None, col_names = None, in_table = False, node_path=
 		for i in range(1,len(cols)):
 			assert len(cols[i]) == length_first_col
 	else:
-		assert col_names is None
+		assert len(cols) == 1
+		if col_names is not None:
+			assert len(col_names) == 1
 	packed_columns = []
 	column_types = []
 	for col in cols:

@@ -1,128 +1,183 @@
-# nwb_indexer and search_nwb
+# nwbindexer and search_nwb
 
 This repository contains two tools for searching within NWB (HDF5) files:
 
-* nwb_indexer - builds an SQLite database containing metadata in
+* **nwbindexer** - builds an SQLite database (also called the 'index') containing metadata in
   a collection of NWB files and and allows searching the metadata in the database.
-* search_nwb.py - searches within one or more NWB files by reading
-  the files directly.
+* **search_nwb.py** - searches within one or more NWB files directly (without building an index).
 
-A related third tool is the NWB Query Engine.  It is at:
-https://github.com/jezekp/NwbQueryEngine .  The two tools in this repository
+A related third tool is the **NWB Query Engine**.  It is at:
+https://github.com/jezekp/NwbQueryEngine.  The two tools in this repository
 use a query syntax similar to the one used in the NWB
 Query Engine.
 
 
 ## Requirements:
-Python 3.7
-(Tested with anaconda Python 3.7; might work with other versions too).
 
-parsimonious parser. Described at:
-https://pypi.org/project/parsimonious/
-Can be installed using:
+1. Python 3.7
+   (Tested with anaconda Python 3.7; might also work with Python > 3.7.  However, it will *not* work with Python < 3.7).
 
-`pip install parsimonious`
+2. parsimonious parser. Described at:
+   https://pypi.org/project/parsimonious/
+   Can be installed using:
+
+   `pip install parsimonious`
+
+
+3. pytest (only required for running tests).  Can be installed using:
+
+   `pip install pytest`
+
 
 
 ## Installation
 
-Download the repository using:
+1. Download the repository using:
 
-```git clone https://github.com/jeffteeters/nwb_indexer.git```
-
-
-Then install using:
-
-```python setup.py install```
+   `git clone https://github.com/jeffteeters/nwbindexer.git`
 
 
+2. cd into the created directory:
 
+   `cd nwbindexer`
 
-(No further steps are needed.  Once downloaded, the tools can be run by specifying the path to the tool inside the
-created "nwb_indexer" directory).
+3. Optional: if parsimonious and pytest are installed, tests can be run on the downloaded package
+   (before installing) by running pytest with no arguments:
 
+   `pytest`
 
-### Testing the installation
+   Output should indicate all tests (5) passed.
 
-To be sure the installation was successful, first create a directory named "test_data" inside the
-"nwb_indexer" directory, e.g. ```cd nwb_indexer```, ```mkdir test_data```.  Then download the
-following NWB files from figshare.com and store
-them inside the "test_data" directory.
+4. To install, make sure you are in the directory 'nwbindexer' containing file "setup.py".  Then type:
 
+   `pip install .`
 
-* https://doi.org/10.6084/m9.figshare.9627803.v1 (File EC9_B15.nwb - 532.3 MB)
-* https://doi.org/10.6084/m9.figshare.9273050.v1 (File GP31_B21.nwb - 1.15 GB)
+5. To test the installation (separately from the files downloaded), cd to a dirctory that does not contain
+   the nwbindexer directory, then type:
 
+   `pytest --pyargs nwbindexer`
 
-If necessary, use the terminal "cd" command to change directories to be directly inside
-the "nwb_indexer" directory, then run script "run_tests.py" by typing:
-
-```
-python run_tests.py
-```
-
-Final line displayed shoud be "All tests passed."  If the test didn't pass, examine
-the displayed output to determine what is wrong.
+   Output should indicate all all tests (5) passed. 
 
 
 
-## nwb_indexer usage:
+## nwbindexer usage:
+ 
+Searching using nwbindexer requires two steps: 1. building the index (a SQLite database) and 2. searching the index. 
 
 ### 1) Build the index.
 
-First, build the index by entering either:
+The index is built by the `build_index.py` program which can be run by entering
+either:
 
-`build_index <directory>`
-
-The above form using a command-line utility installed.
+`build_nwbindex <nwb_directory> [ <index_path> ]`
 
 or
 
-`python -m nwbindexer.build_index <directory>`
+`python -m nwbindexer.build_index <nwb_directory> [ <index_path> ]`
 
 
-The above runs the command by specifying the package containing the build_index utility.
+The first form (build_nwbindex) uses a command-line utility installed by the nwbindexer package.  The
+second runs the command by specifying the python module directly.  For both forms, the arguments are:
 
+```
+    <nwb_directory> - name of directory to scan for nwb files (extension ".nwb")
+    <index_path> - path to index file:
+         If nothing is specified, uses 'nwb_index.db' in the current directory
+         If only a directory specifed, uses 'nwb_index.db' in the specified directory
+```
 
-
-
-
-`python build_index.py <directory>`
-
-where:
-`<directory>` is a directory containing nwb files (extension ".nwb).
-
-This should scan all the nwb files in the directory and save the
-information about the small datasets and attributes in a SQLite3 database.
-Name of the database file will be "nwb_index.db".  The program can be
-run multiple times with different directories to index additional
-NWB files.
+The command scans all the nwb files in <nwb_directory> (and subdirectories) and saves the
+information about small datasets and attributes in the index file (a SQLite3 database) specified by
+<index_path>.  The program can be run multiple times with a different <nwb_directory>
+and the same <index_path> to add information about additional NWB files to the specified index.
 
 
 ### 2) Running queries.
 
-Queries can be run by running:
+Once the index file is built, queries can be run by running either:
 
-`python query_index.py <index_file> [ <query> ]`
+`query_nwbindex <index_path> [ <query> ]`
 
-`<index_file>` = path to sqlite3 database file created in step 1 or '-' for the default database (nwb_index.db)
+or
 
-`<query>` = query to execute (optional).  If present, must be quoted.  If not present, interactive mode is used
-which allows entering multiple queries interactively.
+`python -m nwbindexer.query_index.py <index_path> [ <query> ]`
+
+Where:
+
+```
+    <index_path> = Path to sqlite3 database file or a directory or '-' for the default database (nwb_index.db)
+                   If is path to a directory, then use default database (nwb_index.db) in that directory.
+    <query> = query to execute (optional).  If present, must be quoted.  If not present, interactive
+              mode is used which allows entering queries interactively.
+```
+
+#### 2.1) Query Format.
+
+Queries are specified using the following format (BNF Grammar):
+
+```
+⟨query⟩ ::= ⟨subquery⟩ ( ⟨andor⟩ ⟨subquery⟩ )*
+⟨subquery⟩ ::= ⟨parent⟩ ‘:’ ( <rhs> | '(' <rhs> ')' )
+<rhs> ::= ( <child_list> <expression> | <child_list> | <expression> )
+<child_list> ::= <child> ( [ ',' ] <child> )* [ ',' ]
+<expression> ::= ⟨expression⟩ ⟨andor⟩ ⟨expression⟩ | ‘(’ ⟨expression⟩ ‘)’
+| ⟨child⟩ ⟨relop⟩ ⟨constant⟩
+| ⟨child⟩ 'LIKE' ⟨string⟩ | ⟨child⟩
+⟨relop⟩ ::= ‘==’ | ‘<=’ | ‘<’ | ‘>=’ | ‘>’ | ‘!=’
+⟨constant⟩ ::= ⟨string⟩ | ⟨number⟩
+⟨andor⟩ ::= ‘&’ | ‘|’
+```
+
+In the grammar: square brakets `[ ]` indicate optional contents, `( )*` indicates zero or more, `( x | y )` indicates `x` or `y` and:
+
+`<parent>`
+     is a path to an HDF5 group or dataset. The path can contain asterisk (*) characters which match
+     zero or more charaters (e.g. '*' functions as a wildcard). 
+
+`<string>`
+     is a string constant enclosed in single or double quotes (with a backslash used to escape quotes).
+     Any string constant used with LIKE must have wildcards ("%" or "_") explicitly included (if no wildcards are
+     included, the query does an exact match).
+
+`<number>`
+     is a numeric constant. 
+
+`<child>`
+     is the name of an HDF5 attribute or dataset within the parent.
+
+`<string>`
+     is a string constant enclosed in single or double quotes with a backslash used to escape the strings.
+
+`<number>`
+     is a numeric constant.
 
 
-Queries are specified using the format described in the NWB Query Engine paper, with the following possible exceptions:
+Some example queries:
+
+=============================================================================  ======================================================
+          Query                                                                      Description
+-----------------------------------------------------------------------------  ------------------------------------------------------
+/general/subject: (species == "Mus musculus")                                  selects all files with the specified species.
+/general:(virus)                                                               selects all records with a virus dataset
+/general:(virus LIKE "%infectionLocation: M2%")                                selects all datasets virus with infectionLocation: M2
+*:(neurodata_type == "RoiResponseSeries")                                      select all TimeSeries containing Calcium imaging data
+*/data: (unit == "unknown")                                                    selects all datasetes data which unit is unknown
+*/epochs/*: (start_time > 500 & start_time < 550 &                             select all epochs with the matching start_time and tags
+ tags LIKE "%HitL%" & tags LIKE "%LickEarly%")
+/general/subject: (subject_id == "anm00210863") & */epochs/*:                  select files with the specified subject_id and epochs
+ (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
+/units: (id > -1 & location == "CA3" & quality > 0.8)                          select unit id where location is CA3 and quality > 0.8
 
 
-
-* Wildcards (*) in the parent location must be specified explicitly, otherwise an absolute location is assumed.
-* Values to be displayed can be specified by a list of child names separated by comma's before the expression.
-* String constants must always be enclosed in either single or doulble quotes.  (I think, need to test both single and double quotes).
-* Any string constant used with LIKE must have wildcards ("%" or "_") explicitly included (if no wildcards are included, the query does an exact match).
-* There must be an expression on the right with a relational operator.  Just giving the child location (e.g. `epochs:(start_time)`) is currently not allowed.
+`/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" &\
+ /epochs/* : start_time < 150`
 
 
-#### Example query (NWB 1.x files):
+`intervals/trials: id, visual_stimulus_time, visual_stimulus_left_contrast == 0.25 & visual_stimulus_right_contrast == 0.25`
+
+
+#### Example queries (NWB 1.x files):
 
 (Using same datasets at the NWB Query Engine test site: http://eeg.kiv.zcu.cz:8080/nwb-query-engine-web/)
 
