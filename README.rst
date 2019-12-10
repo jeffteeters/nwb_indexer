@@ -171,24 +171,103 @@ Some example queries:
    "\*/data: (unit == ""unknown"")",                    "Selects all datasetes data which unit is unknown"
    "\*/epochs/\*: (start_time > 500 & start_time < 550 & tags LIKE ""%HitL%"" & tags LIKE ""%LickEarly%"")", "Select all epochs with the matching start_time and tags"
    "/general/subject: (subject_id == ""anm00210863"") & \*/epochs/\*: (start_time > 500 & start_time < 550 & tags LIKE ""%LickEarly%"")", "Select files with the specified subject_id and epochs"
-   "/units: (id > -1 & location == ""CA3"" & quality > 0.8)", "Select unit id where location is CA3 and quality > 0.8"
+   "/units: id, location == ""CA3"" & quality > 0.8)",   "Select unit id where location is CA3 and quality > 0.8"
 
 
 
-=============================================================================  ======================================================
-          Query                                                                      Description
------------------------------------------------------------------------------  ------------------------------------------------------
-/general/subject: (species == "Mus musculus")                                  Selects all files with the specified species.
-/general:(virus)                                                               Selects all records with a virus dataset
-/general:(virus LIKE "%infectionLocation: M2%")                                Selects all datasets virus with infectionLocation: M2
-\*:(neurodata_type == "RoiResponseSeries")                                     Select all TimeSeries containing Calcium imaging data
-\*/data: (unit == "unknown")                                                   Selects all datasetes data which unit is unknown
-\*/epochs/\*: (start_time > 500 & start_time < 550 &                           Select all epochs with the matching start_time and tags
-    tags LIKE "%HitL%" & tags LIKE "%LickEarly%")
-/general/subject: (subject_id == "anm00210863") & \*/epochs/\*:                Select files with the specified subject_id and epochs
- (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
-/units: (id > -1 & location == "CA3" & quality > 0.8)                          Select unit id where location is CA3 and quality > 0.8
-=============================================================================  ======================================================
+3.4 Example output
+------------------
+
+The output generated in this sections is generated using the three sample NWB files included in the package in the "test" directory.
+(The commands were run inside directory "nwbindexer/test").
+
+**Building the index**
+
+``$ python -m nwbindexer.build_index ./``::
+
+    Creating database 'nwb_index.db'
+    scanning directory ./
+    Scanning file 1: ./basic_example.nwb
+    Scanning file 2: ./ecephys_example.nwb
+    Scanning file 3: ./ophys_example.nwb
+
+(results in creating file ``nwb_index.db``).
+
+
+**Output from different queries:**
+
+
+``$ python -m nwbindexer.query_index - "general/optophysiology/*: excitation_lambda == 600.0"``::
+
+
+    Using index_path: 'nwb_index.db'
+    Opening 'nwb_index.db'
+    Found 1 matching files:
+    [   {   'file': './ophys_example.nwb',
+            'subqueries': [   [   {   'node': '/general/optophysiology/my_imgpln',
+                                      'vind': {'excitation_lambda': 600.0},
+                                      'vtbl': {}}]]}]
+
+``$ python -m nwbindexer.query_index - "general/extracellular_ephys/tetrode1: location LIKE '%hippocampus'"``::
+
+    Using index_path: 'nwb_index.db'
+    Opening 'nwb_index.db'
+    Found 1 matching files:
+    [   {   'file': './ecephys_example.nwb',
+            'subqueries': [   [   {   'node': '/general/extracellular_ephys/tetrode1',
+                                      'vind': {   'location': 'somewhere in the '
+                                                              'hippocampus'},
+                                      'vtbl': {}}]]}]
+
+``$ python -m nwbindexer.query_index - "units: id, location == 'CA3' & quality > 0.8"``::
+
+    Using index_path: 'nwb_index.db'
+    Opening 'nwb_index.db'
+    Found 1 matching files:
+    [   {   'file': './basic_example.nwb',
+            'subqueries': [   [   {   'node': '/units',
+                                      'vind': {},
+                                      'vtbl': {   'child_names': [   'id',
+                                                                     'location',
+                                                                     'quality'],
+                                                  'combined': [   {   'id': 2,
+                                                                      'location': 'CA3',
+                                                                      'quality': 0.85}],
+                                                  'row_values': [   (   2,
+                                                                        'CA3',
+                                                                        0.85)]}}]]}]
+
+3.5 Format of query output
+--------------------------
+
+The output of the ``query_index.py`` utility (and also the ``search_nwb.py`` utility described in the next section) is in JSON with the
+following structure:
+
+    ``[ <file 1 results>, <file 2 results>, ... ]``
+
+Where each ``file N result`` is a JSON object (equilivant to a python dictionary)
+with keys ``file`` and ``subqueries``.
+
+The value associate with the ``File`` key is the full path to the NWB file.  The value of the ``subqueries`` key is an
+xarray of subquery results:
+
+    ``[ <subquery 1 result>, <subquery 2 result>, ... ]``
+
+Each ``<subquery N result>`` is a list of ``<node results>`` for that subquery:
+
+    ``[ <node 1 result>, <node 2 result>, ... ]``
+
+Each ``<node N result>`` is a dictionary giving information about the node (location in the HDF5 / NWB file, and the child nodes that are
+referenced in the subquery.  The dictionary has keys:
+``node`` - the path to the node (group or dataset) withing the HDF5 file
+``vind`` - values for 'individual' children of the node, that is, children that are not part of a dynamic table.
+``vtbl`` - values for children that are part of a dynamic table.
+
+ 
+ 
+ 
+
+
 
 
 
@@ -198,9 +277,6 @@ Some example queries:
 
 ``intervals/trials: id, visual_stimulus_time, visual_stimulus_left_contrast == 0.25 & visual_stimulus_right_contrast == 0.25``
 
-
-3.4 Example queries
--------------------
 
 
 (Using same datasets at the NWB Query Engine test site: http://eeg.kiv.zcu.cz:8080/nwb-query-engine-web/)
