@@ -17,9 +17,6 @@ import nwbindexer.lib.results as results
 
 pp = pprint.PrettyPrinter(indent=4)
 
-sample_file = "../pynwb_examples/tutorials_python/general/basic_example.nwb"
-
-
 def make_indexed_lists(tags, tags_index):
 	# build tags_lists - list of tags in array by ids
 	# tags - list of values, for example, "tags"
@@ -462,17 +459,13 @@ def process_command_line(path, query):
 		query_file_or_directory(path, qi)
 
 def main():
-	global sample_file
 	arglen = len(sys.argv)
 	if arglen < 2 or arglen > 3:
 		print("Usage: %s <path> [ <query> ]" % sys.argv[0])
-		print(" <path> = path to NWB file or directory or '-' for default path")
+		print(" <path> = path to an NWB file or to a directory containing nwb files")
 		print(" <query> = query to execute (optional).  If present, must be quoted.")
 		sys.exit("")
 	path = sys.argv[1]
-	if path == "-":
-		path = sample_file
-		print("Using default path: '%s'" % path)
 	if not os.path.exists(path):
 		sys.exit("ERROR: path '%s' was not found!" % path)
 	query = sys.argv[2] if arglen == 3 else None

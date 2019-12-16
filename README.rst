@@ -171,7 +171,7 @@ Some example queries:
    "\*/data: (unit == ""unknown"")",                    "Selects all datasetes data which unit is unknown"
    "\*/epochs/\*: (start_time > 500 & start_time < 550 & tags LIKE ""%HitL%"" & tags LIKE ""%LickEarly%"")", "Select all epochs with the matching start_time and tags"
    "/general/subject: (subject_id == ""anm00210863"") & \*/epochs/\*: (start_time > 500 & start_time < 550 & tags LIKE ""%LickEarly%"")", "Select files with the specified subject_id and epochs"
-   "/units: id, location == ""CA3"" & quality > 0.8)",   "Select unit id where location is CA3 and quality > 0.8"
+   "/units: id, location == ""CA3"" & quality > 0.8",   "Select unit id where location is CA3 and quality > 0.8"
 
 
 
@@ -240,16 +240,16 @@ The output generated in this sections is generated using the three sample NWB fi
 3.5 Format of query output
 --------------------------
 
-The output of the ``query_index.py`` utility (and also the ``search_nwb.py`` utility described in the next section) is in JSON with the
-following structure:
+The output of the ``query_index.py`` utility (and also the ``search_nwb.py`` utility described in the next section) is in JSON
+https://www.json.org/ with the following structure:
 
     ``[ <file 1 results>, <file 2 results>, ... ]``
 
 Where each ``file N result`` is a JSON object (equilivant to a python dictionary)
 with keys ``file`` and ``subqueries``.
 
-The value associate with the ``File`` key is the full path to the NWB file.  The value of the ``subqueries`` key is an
-xarray of subquery results:
+The value associate with the ``file`` key is the full path to the NWB file.  The value of the ``subqueries`` key is an
+array of subquery results:
 
     ``[ <subquery 1 result>, <subquery 2 result>, ... ]``
 
@@ -257,16 +257,71 @@ Each ``<subquery N result>`` is a list of ``<node results>`` for that subquery:
 
     ``[ <node 1 result>, <node 2 result>, ... ]``
 
-Each ``<node N result>`` is a dictionary giving information about the node (location in the HDF5 / NWB file, and the child nodes that are
-referenced in the subquery.  The dictionary has keys:
-``node`` - the path to the node (group or dataset) withing the HDF5 file
-``vind`` - values for 'individual' children of the node, that is, children that are not part of a dynamic table.
-``vtbl`` - values for children that are part of a dynamic table.
+Each ``<node N result>`` is a dictionary giving information about the parent node (location in the HDF5 / NWB file,
+and child nodes (groups, attributes or datasets directly within the parent) that are referenced in the subquery.  The dictionary has keys:
+
+``node``
+    The path to the parent node (group or dataset) withing the HDF5 file.
+
+``vind``
+    Values for 'individual' children of the node, that is, children that are not part of a NWB DynamicTable (described below).
+    The values are provided in a JSON object (python dictionary) where the keys are the name of each child and the
+    values are the values stored in the child.
+
+``vtbl``
+    Values for children that are part of a NWB DynamicTable.  An NWB DynamicTable is a method used within the NWB format
+    to store tabular data that are aligned along the rows, like a spreadsheet.  It is described at:
+    https://nwb-schema.readthedocs.io/en/latest/format.html#sec-dynamictable.  The value of ``vtbl`` is described
+    in the next section.
+
+
+The value of ``vtbl`` is a JSON Object (Python dictionary) with keys: ``child_names``, ``row_values`` and ``combined``.
+They have the following meaning:
+
+``child_names``
+    A tuple listing all of the children.  This is equivalent to the header row in a spreadsheet which lists in order,
+    the columns in the spreadsheet.
+
+``row_values``
+    Contains a list of tuples, each tuple contains aligned values associated with the names in ``child_names``.
+    In other words, each tuple has vaues for one row of the spreadsheet with the header ``child_names``.
+
+``combined``
+    Contains a list of JSON Objects (python dictionaries), each dictionary has data for one row in the returned
+    results.  That is, in each dictionary, the keys are the ``child_names`` (spredsheet header row names) and
+    the value for each key is the value of that child in the row.  This is another way of represening the data
+    that are in ``child_names`` and ``row_values``.
 
  
- 
- 
 
+4. search_nwb.py usage
+======================
+
+
+The search_nwb.py tool searches directly within NWB files for data matching a query.  It does not use an index file
+(unlike the nwbindexer tool).
+
+The search_nwb tool is run using either:
+
+search_nwb <path> [ <query> ]
+
+or
+
+python -m nwbindexer.search_nwb.pr <path> [ <query> ]
+
+The first form (search_nwb) uses a command-line utility installed by the nwbindexer package.
+The second runs the command by specifying the python module directly. If no arguments are entered,
+the usage informatio is displayed. The arguments are:
+
+``<path>``
+    path to an NWB file or a directory containing nwb files.
+
+``<query>``
+    query to execute (optional).  If present, must be quoted.
+
+
+The ``<query>`` has the same format as described in Section 3.3. (for the ``query_index.py`` utility, described in Section 3.3.
+The output format of ``search_nwb.py`` is the same as for ``query_index.py``,
 
 
 
