@@ -26,7 +26,7 @@ Query:
 
 Output is:
 
-.. code-block:: none
+.. code::
 
    Using index_path: '../../sample_data/nwb_index.db'
    Opening '../../sample_data/nwb_index.db'
@@ -64,7 +64,7 @@ Query:
 Output:
 
 
-.. code-block:: none
+.. code::
 
 
    Using index_path: '../../sample_data/nwb_index.db'

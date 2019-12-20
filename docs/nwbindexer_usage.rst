@@ -1,12 +1,12 @@
-.. _nwbindexer_usage:
+x.. _nwbindexer_usage:
 
 nwbindexer usage
 ================ 
 
 Searching using nwbindexer requires two steps: 1. building the index (a SQLite database) and 2. searching the index. 
 
-3.1 Build the index
--------------------
+Build the index
+---------------
 
 The index is built by the ``build_index.py`` program which can be run by entering
 either:
@@ -34,8 +34,8 @@ information about small datasets and attributes in the index file (a SQLite3 dat
 and the same <index_path> to add information about additional NWB files to the specified index.
 
 
-3.2 Running queries
--------------------
+Running queries
+---------------
 
 Once the index file is built, queries can be run by running either:
 
