@@ -28,5 +28,5 @@ License
 License terms are in file ``license.txt`` (reproduced below).
 
 
-.. include:: ../license.txt
+.. include:: license.txt
 
