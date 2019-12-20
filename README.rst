@@ -303,15 +303,15 @@ The search_nwb.py tool searches directly within NWB files for data matching a qu
 
 The search_nwb tool is run using either:
 
-search_nwb <path> [ <query> ]
+``search_nwb <path> [ <query> ]``
 
 or
 
-python -m nwbindexer.search_nwb.pr <path> [ <query> ]
+``python -m nwbindexer.search_nwb.pr <path> [ <query> ]``
 
 The first form (search_nwb) uses a command-line utility installed by the nwbindexer package.
 The second runs the command by specifying the python module directly. If no arguments are entered,
-the usage informatio is displayed. The arguments are:
+the usage information is displayed. The arguments are:
 
 ``<path>``
     path to an NWB file or a directory containing nwb files.
@@ -321,176 +321,229 @@ the usage informatio is displayed. The arguments are:
 
 
 The ``<query>`` has the same format as described in Section 3.3. (for the ``query_index.py`` utility, described in Section 3.3.
-The output format of ``search_nwb.py`` is the same as for ``query_index.py``,
+The output format of ``search_nwb.py`` is the same as for ``query_index.py``.
+
+
+5. Multiple subquery examples
+=============================
+
+Queries can be created by combining multiple subqueries.  Some examples along with the output are shown
+below.  The datasets (nwb files) used in the examples are:
+
+* The first 16 files in the alm-1 data set at CRCNS.org
+  (http://crcns.org/data-sets/motor-cortex/alm-1), which contains
+  anterior motor cortex recordings from the Svoboda Lab at Janelia Farm.
+  The total size of these data files is (2.2 GB).
+
+* NWB-formatted dataset from Steinmetz et al. Nature 2019.  Available at:
+  https://figshare.com/articles/Datasets_from_Steinmetz_et_al_2019_in_NWB_format/11274968
+  File: Steinmetz2019_Forssmann_2017-11-05.nwb (267.96 MB)
+
+In the sample queries (done with the query_index.py utility) the index file (nwb_index.db) is located in
+the `../../sample_data`` directory).  The output would be the same if the ``search_nwb.py`` utility is
+used if a directory containing the nwb files was specifed in the command.
+
+
+Query:
+
+``$ python -m nwbindexer.query_index ../../sample_data '/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 15'``
 
 
 
+Output is:
 
+.. code-block::
 
-``/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/\* : start_time < 150``
-
-
-``intervals/trials: id, visual_stimulus_time, visual_stimulus_left_contrast == 0.25 & visual_stimulus_right_contrast == 0.25``
-
-
-
-(Using same datasets at the NWB Query Engine test site: http://eeg.kiv.zcu.cz:8080/nwb-query-engine-web/)
-
-``/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/\* : start_time < 150``
-
-Output:::
-
-  Opening 'nwb_index.db'
-  Found 2 matching files:
-  [   {   'file': '../sample_data/data_structure_ANM210862_20130627.nwb',
-          'subqueries': [   [   {   'node': '/general/subject',
-                                    'vind': {   'age': [   '3 months 16 days  '
-                                                           'weeks'],
-                                                'species': ['Mus musculus']},
-                                    'vtbl': {}}],
-                            [   {   'node': '/',
-                                    'vind': {   'file_create_date': [   '2017-04-24T11:32:54.21588']},
-                                    'vtbl': {}}],
-                            [   {   'node': '/epochs/trial_001',
-                                    'vind': {'start_time': [2.284463]},
-                                    'vtbl': {}}]]},
-      {   'file': '../sample_data/data_structure_ANM210863_20130627.nwb',
-          'subqueries': [   [   {   'node': '/general/subject',
-                                    'vind': {   'age': [   '3 months 16 days  '
-                                                           'weeks'],
-                                                'species': ['Mus musculus']},
-                                    'vtbl': {}}],
-                            [   {   'node': '/',
-                                    'vind': {   'file_create_date': [   '2017-04-24T11:32:54.07628']},
-                                    'vtbl': {}}],
-                            [   {   'node': '/epochs/trial_001',
-                                    'vind': {'start_time': [2.222392]},
-                                    'vtbl': {}}]]}]
-
-
-**Example query (NWB 2.x files):**
-
-
-``python query_index.py - '/units: id, location, quality > 0.93'``
-
-Output:::
-
-
-   Opening 'nwb_index.db'
-   Found 1 matching files:
-   [   {   'file': '../pynwb_examples/tutorials_python/general/basic_example.nwb',
-           'subqueries': [   [   {   'node': '/units',
-                                     'vind': {},
-                                     'vtbl': {   'child_names': [   'id',
-                                                                    'location',
-                                                                    'quality'],
-                                                 'row_values': [   (   1,
-                                                                       'CA1',
-                                                                       0.95)]}}]]}]
-
-
-
-4. search_nwb.py usage
-======================
-
-The search_nwb.py utility operates like the NWB Query Engine, searching either all nwb files in a directory or a specific NWB file.
-
-It is run using either:
-
-``search_nwb <data_path> [ <query> ]``
-
-or
-
-``python -m nwbindexer.search_nwb <data_path> [ <query> ]``
-
-Where:
-
-   <data_path>:
-       Path to NWB file or directory
-
-    <query>:
-       Query to execute (optional).  If present, must be quoted.
-
-
-
-4.1 Example query (NWB 1.x files)
----------------------------------
-
-
-``python search_nwb.py ../sample_data/ '/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 150``
-
-Output:::
-
+   Using index_path: '../../sample_data/nwb_index.db'
+   Opening '../../sample_data/nwb_index.db'
    Found 2 matching files:
-   [   {   'file': '../sample_data/data_structure_ANM210862_20130627.nwb',
+   [   {   'file': './nwb1/data_structure_ANM210862_20130627.nwb',
            'subqueries': [   [   {   'node': '/general/subject',
-                                     'vind': {   'age': [   b'3 months 16 days  weeks'],
-                                                 'species': [b'Mus musculus']},
+                                     'vind': {   'age': '3 months 16 days  weeks',
+                                                 'species': 'Mus musculus'},
                                      'vtbl': {}}],
                              [   {   'node': '/',
-                                     'vind': {   'file_create_date': [   b'2017'
-                                                                         b'-04-'
-                                                                         b'24T1'
-                                                                         b'1:32'
-                                                                         b':54.'
-                                                                         b'2158'
-                                                                         b'83']},
+                                     'vind': {   'file_create_date': '2017-04-24T11:32:54.215883'},
                                      'vtbl': {}}],
                              [   {   'node': '/epochs/trial_001',
-                                     'vind': {'start_time': [2.284463]},
+                                     'vind': {'start_time': 2.284463},
                                      'vtbl': {}}]]},
-       {   'file': '../sample_data/data_structure_ANM210863_20130627.nwb',
+       {   'file': './nwb1/data_structure_ANM210863_20130627.nwb',
            'subqueries': [   [   {   'node': '/general/subject',
-                                     'vind': {   'age': [   b'3 months 16 days  weeks'],
-                                                 'species': [b'Mus musculus']},
+                                     'vind': {   'age': '3 months 16 days  weeks',
+                                                 'species': 'Mus musculus'},
                                      'vtbl': {}}],
                              [   {   'node': '/',
-                                     'vind': {   'file_create_date': [   b'2017'
-                                                                         b'-04-'
-                                                                         b'24T1'
-                                                                         b'1:32'
-                                                                         b':54.'
-                                                                         b'0762'
-                                                                         b'84']},
+                                     'vind': {   'file_create_date': '2017-04-24T11:32:54.076284'},
                                      'vtbl': {}}],
                              [   {   'node': '/epochs/trial_001',
-                                     'vind': {'start_time': [2.222392]},
+                                     'vind': {'start_time': 2.222392},
                                      'vtbl': {}}]]}]
 
 
-The output is the same as for query_index.py, except strings displayed as bytes instead of python strings.  This is because
-the strings are stored as bytes in the NWB (HDF5) file but as strings in the sqlite3 database.  TODO: Need to
-explain this better.  The time for the query is much longer (15 seconds vs less than 1 second for the query_index.py tool).
 
 
+Query:
 
-4.2 Example query (NWB 2.x files)
----------------------------------
+``python -m nwbindexer.query_index ../../sample_data 'intervals/trials: id, visual_stimulus_time, visual_stimulus_left_contrast == 0.25 & visual_stimulus_right_contrast == 0.25'``
+
+Output:
 
 
-``time python search_nwb.py ../pynwb_examples/ '/units: id, location, quality > 0.93``
+.. code-block::
 
-Output:::
 
+   Using index_path: '../../sample_data/nwb_index.db'
+   Opening '../../sample_data/nwb_index.db'
    Found 1 matching files:
-   [   {   'file': '../pynwb_examples/tutorials_python/general/basic_example.nwb',
-           'subqueries': [   [   {   'node': '/units',
+   [   {   'file': './steinmentz2019/Steinmetz2019_Forssmann_2017-11-05.nwb',
+           'subqueries': [   [   {   'node': '/intervals/trials',
                                      'vind': {},
                                      'vtbl': {   'child_names': [   'id',
-                                                                    'location',
-                                                                    'quality'],
-                                                 'row_values': [   (   1,
-                                                                       'CA1',
-                                                                       0.95)]}}]]}]
+                                                                    'visual_stimulus_time',
+                                                                    'visual_stimulus_left_contrast',
+                                                                    'visual_stimulus_right_contrast'],
+                                                 'combined': [   {   'id': 95,
+                                                                     'visual_stimulus_left_contrast': 0.25,
+                                                                     'visual_stimulus_right_contrast': 0.25,
+                                                                     'visual_stimulus_time': 468.198},
+                                                                 {   'id': 150,
+                                                                     'visual_stimulus_left_contrast': 0.25,
+                                                                     'visual_stimulus_right_contrast': 0.25,
+                                                                     'visual_stimulus_time': 697.717}],
+                                                 'row_values': [   (   95,
+                                                                       468.198,
+                                                                       0.25,
+                                                                       0.25),
+                                                                   (   150,
+                                                                       697.717,
+                                                                       0.25,
+                                                                       0.25)]}}]]}]
 
-   real								    0m1.245s
-   user								    0m0.383s
-   sys								    0m0.208s
+
+6. speed_check.py
+=================
+
+Also included in the package is a program named ``speed_check.py``, which can be used to compare the speed
+of different queries performed using the two tools in this package (``query_index.py`` and ``search_nwb.py``)
+and also the Java tool (the NWB Query Engine, available at: https://github.com/jezekp/NwbQueryEngine).
+
+Running ``speed_check.py`` without any command-line arguments displays the instructions:
+
+``python -m nwbindexer.speed_check``
+
+Output is:::
+
+   Usage: /.../speed_check.py ( i | - | <query> ) [ <data_dir> [ <java_tool_dir> ] ]
+    First parameter required:
+       Either one characer: 'i' - interactive mode, '-' use stored default queries
+       *OR* a single query to execute; must be quoted.
+    After the first parameter, optionally specify:
+       <data_dir> - directory containing nwb files AND index file ('nwb_index.db' built by build_index.py)
+       <java_tool_dir> - directory containing NWB Query Engine (java tool)
+       If <data_dir> not specified, uses: ../sample_data
+       If <java_tool_dir> not specified, uses: /Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
 
 
+The source of the script (file ``speed_check.py``) can be edited to change the default directory for the <java_tool_dir>.
 
 
-Version History
-===============
+An example run of the tool and the final output is shown below.
 
-0.1.0 - Initial version.  Works on a variety of files tested.
+
+$ python -m nwbindexer.speed_check - ../../sample_data
+
+Output::
+   
+   # A
+   
+   ------- query A -------
+   epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
+   Starting: ** java ** with: epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
+   dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
+   cmd:java -Djava.library.path=src/main/resources/ -jar target/nwbqueryengine-1.0-SNAPSHOT-jar-with-dependencies.jar /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data 'epochs*:(start_time>200 & stop_time<400 | stop_time>1600)'
+   Dataset: epochs/trial_011/stop_time, Value: 223.430533, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   Dataset: epochs/trial_010/stop_time, Value: 214.274403, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   Dataset: epochs/trial_018/start_time, Value: 312.970341, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   
+   ...
+   
+   Time, user=12.9647, sys=1.2751, total=14.2398
+   Starting: ** search_nwb ** with: epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
+   dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
+   cmd:python -m nwbindexer.search_nwb /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data 'epochs*:(start_time>200 & stop_time<400 | stop_time>1600)'
+   Found 16 matching files:
+   [   {   'file': '/Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb',
+           'subqueries': [   [   {   'node': '/epochs/trial_010',
+                                     'vind': {   'start_time': 202.908281,
+                                                 'stop_time': 214.274403},
+                                     'vtbl': {}},
+                                 {   'node': '/epochs/trial_011',
+                                     'vind': {   'start_time': 214.274403,
+                                                 'stop_time': 223.430533},
+                                     'vtbl': {}},
+                                 {   'node': '/epochs/trial_012',
+                                     'vind': {   'start_time': 223.430533,
+                                                 'stop_time': 243.704452},
+                                     'vtbl': {}},
+      
+   ...
+   
+   Time, user=22.2331, sys=1.4197, total=23.6527
+   Starting: ** query_index ** with: epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
+   dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
+   cmd:python -m nwbindexer.query_index /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb_index.db 'epochs*:(start_time>200 & stop_time<400 | stop_time>1600)'
+   Opening '/Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb_index.db'
+   Found 16 matching files:
+   [   {   'file': './nwb1/data_structure_ANM210861_20130701.nwb',
+           'subqueries': [   [   {   'node': '/epochs/trial_010',
+                                     'vind': {   'start_time': 202.908281,
+                                                 'stop_time': 214.274403},
+                                     'vtbl': {}},
+                                 {   'node': '/epochs/trial_011',
+                                     'vind': {   'start_time': 214.274403,
+                                                 'stop_time': 223.430533},
+                                     'vtbl': {}},
+                                 {   'node': '/epochs/trial_012',
+                                     'vind': {   'start_time': 223.430533,
+                                                 'stop_time': 243.704452},
+                                     'vtbl': {}},
+   ...
+   
+   Time, user=1.9567, sys=0.2405, total=2.1972
+   # B
+   
+   ------- query B -------
+   */data: (unit == "unknown")
+   Starting: ** java ** with: */data: (unit == "unknown")
+   dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
+   cmd:java -Djava.library.path=src/main/resources/ -jar target/nwbqueryengine-1.0-SNAPSHOT-jar-with-dependencies.jar /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data '*/data: (unit == "unknown")'
+   Dataset: acquisition/timeseries/lick_trace/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   Dataset: stimulus/presentation/pole_in/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   
+   ...
+   
+   
+   Time, user=0.3968, sys=0.0924, total=0.4892
+   # G
+   # Don't include this because there are so many groups found in the Churchland dataset
+   # *:(neurodata_type == "RoiResponseSeries")
+   
+   Queries in test:
+   A. epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
+   B. */data: (unit == "unknown")
+   C. general/subject: (subject_id == "anm00210863") & epochs/*: (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
+   D. units: (id > -1 & location == "CA3" & quality > 0.8)
+   E. general:(virus LIKE "%infectionLocation: M2%")
+   F. general/optophysiology/*: (excitation_lambda)
+   timing results are:
+   qid	java	search_nwb	query_index
+   A	14.2398	23.6527	2.1972
+   B	50.8242	74.5105	1.0670
+   C	16.8795	27.2111	0.5328
+   D	2.2005	0.5240	0.4821
+   E	1.8188	0.5704	0.4783
+   F	1.7239	0.6262	0.4892
+   
+
+
