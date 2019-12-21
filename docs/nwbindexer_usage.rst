@@ -29,7 +29,7 @@ or
 
 The first form (``build_nwbindex``) uses a command-line utility installed by the nwbindexer package.  The
 second runs the command by specifying the python module directly.  If no arguments are entered, the usage
-informatio is displayed.  The arguments are:::
+information is displayed.  The arguments are: ::
 
     <nwb_directory> - Name of directory to scan for nwb files (extension ".nwb")
     <index_path>    - Path to index file.

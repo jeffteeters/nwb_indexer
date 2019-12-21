@@ -30,6 +30,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.7',
-    install_requires=["parsimonious>=0.8.1",]
+    install_requires=["parsimonious>=0.8.1","h5py>=2.9","numpy"]
 )
 
