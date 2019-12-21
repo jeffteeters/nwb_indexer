@@ -1,3 +1,9 @@
+.. index:: 
+   single: Installation
+   single: pytest
+   single: testing
+
+
 Installation
 ============
 

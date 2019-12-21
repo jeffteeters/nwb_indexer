@@ -1,3 +1,6 @@
+.. index::
+   single: NWB files used
+
 NWB files used
 ==============
 

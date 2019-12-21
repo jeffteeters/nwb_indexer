@@ -1,3 +1,7 @@
+.. index::
+   single: Multiple subquery examples
+
+
 Multiple subquery examples
 ==========================
 

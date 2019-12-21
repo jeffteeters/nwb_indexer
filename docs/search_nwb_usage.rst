@@ -1,3 +1,8 @@
+.. index::
+   single: search_nwb.py usage
+   single: search_nwb
+   single: search_nwb.py
+
 search_nwb.py usage
 ===================
 
@@ -11,7 +16,7 @@ The search_nwb tool is run using either:
 
 or
 
-``python -m nwbindexer.search_nwb.pr <path> [ <query> ]``
+``python -m nwbindexer.search_nwb.py <path> [ <query> ]``
 
 The first form (search_nwb) uses a command-line utility installed by the nwbindexer package.
 The second runs the command by specifying the python module directly. If no arguments are entered,

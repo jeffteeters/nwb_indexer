@@ -1,4 +1,13 @@
-x.. _nwbindexer_usage:
+.. index::
+   single: nwbindexer usage
+   single: build_nwbindex
+   single: build_index
+   single: query_nwbindex
+   single: query_index
+   pair: index file; nwb_index.db
+
+.. _nwbindexer_usage:
+
 
 nwbindexer usage
 ================ 
@@ -30,9 +39,12 @@ informatio is displayed.  The arguments are:::
 
 The command scans all the nwb files in <nwb_directory> (and subdirectories) and saves the
 information about small datasets and attributes in the index file (a SQLite3 database) specified by
-<index_path>.  The program can be run multiple times with a different <nwb_directory>
+<index_path>.  The default name of the index file is ``nwb_index.db``.
+The program can be run multiple times with a different <nwb_directory>
 and the same <index_path> to add information about additional NWB files to the specified index.
 
+.. index::
+   pair: nwbindexer usage; Running queries
 
 Running queries
 ---------------

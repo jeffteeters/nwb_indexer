@@ -1,3 +1,6 @@
+.. index::
+   single: Example output
+
 Example output
 --------------
 
@@ -60,6 +63,7 @@ The output generated in this sections is generated using the three sample NWB fi
                                                                         'CA3',
                                                                         0.85)]}}]]}]
 
+.. index:: Query output format
 
 .. _format_of_query_output:
 

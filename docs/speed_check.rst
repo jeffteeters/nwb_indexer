@@ -1,3 +1,7 @@
+.. index::
+   single: speed_check.py
+
+
 speed_check.py
 ==============
 

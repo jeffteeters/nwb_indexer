@@ -1,6 +1,11 @@
 About nwbindexer
 ================
 
+.. index::
+   single: nwbindexer
+   single: NWB Query Engine
+   single: search_nwb.py
+
 *nwbindexer* is a python package that contains two tools for searching within NWB (HDF5) files:
 
 * **nwbindexer** - builds an SQLite database (also called the 'index') containing metadata in

@@ -1,3 +1,7 @@
+.. index::
+   single: Query format
+   single: BNF Grammar
+
 .. _query_format:
 
 Query Format
