@@ -3,6 +3,9 @@
    single: search_nwb
    single: search_nwb.py
 
+.. _search_nwb_usage:
+
+
 search_nwb.py usage
 ===================
 
