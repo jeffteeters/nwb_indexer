@@ -34,10 +34,9 @@ The source of the script (file *speed_check.py*) can be edited to change the def
 
 
 An example run of the tool and the final output is shown below.  A line with three dots ( ... ) indicates lines that were removed
-from the output shown here to reduce the length.  The actual outout is over 41,000 lines because
-some of the queries return lots of results.  The Java tool may actually be faster than shown in the results listed at the
-end because the version of the Java tool run may not be configured to run as fast as possible (logging has not been
-turned off).
+from the output to reduce the length.  The actual outout is over 41,000 lines because
+some of the queries return lots of results.  The times shown in the results can vary between runs
+due to variations in the system operation (threads running, memory usage) during each run. 
 
 
 $ ``python -m nwbindexer.speed_check - ../../sample_data``
@@ -126,9 +125,10 @@ Output:
    F. general/optophysiology/*: (excitation_lambda)
    timing results are:
    qid	java	search_nwb	query_index
-   A      16.4115 21.9389		1.9645
-   B      49.9601 92.4630		1.4372
-   C      21.0267 28.3272		0.5513
-   D      2.1893  0.5208		0.5281
-   E      1.7935  0.6196		0.4885
-   F      2.0566  0.6860		0.5569
+   qid    java    search_nwb	query_index
+   A      15.0498 19.5296		1.6556
+   B      42.4251 45.6907		0.7473
+   C      14.6853 19.4045		0.4115
+   D      1.9330  0.4276		0.3980
+   E      1.6215  0.4448		0.4142
+   F      1.5617  0.5135		0.3936
