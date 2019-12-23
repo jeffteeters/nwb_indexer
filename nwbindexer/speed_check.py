@@ -43,16 +43,10 @@ units: (id > -1 & location == "CA3" & quality > 0.8)
 general:(virus LIKE "%infectionLocation: M2%")
 # F
 general/optophysiology/*: (excitation_lambda)
+"""
 # G
 # Don't include this because there are so many groups found in the Churchland dataset
 # *:(neurodata_type == "RoiResponseSeries")
-"""
-
-# tools = ["java", "search_nwb", "query_index"]
-# tool_info = {"java": {"cmd": java_cmd, "dir": java_tool_dir},
-# 	"search_nwb": {"cmd": "python -m nwbindexer.search_nwb " + data_dir, "dir": python_tools_dir},
-# 	"query_index": {"cmd": "python -m nwbindexer.query_index -", "dir": python_tools_dir}
-# }
 
 tools_cmd = None
 tools = None
