@@ -1,19 +1,23 @@
 .. index::
    single: speed_check.py
 
+.. _speed_check:
 
 speed_check.py
 ==============
 
-Also included in the package is a program named ``speed_check.py``, which can be used to compare the speed
-of different queries performed using the two tools in this package (``query_index.py`` and ``search_nwb.py``)
-and also the Java tool (the NWB Query Engine, available at: https://github.com/jezekp/NwbQueryEngine).
+Also included in the package is a program named *speed_check.py*, which can be used to compare the speed
+of different queries performed using the two query tools in this package (the nwbindexer :ref:`query_index.py <query_the_index>` and
+:ref:`search_nwb.py <search_nwb_usage>`)
+and also the Java tool (the *NWB Query Engine*, available at: https://github.com/jezekp/NwbQueryEngine).
 
-Running ``speed_check.py`` without any command-line arguments displays the instructions:
+Running *speed_check.py* without any command-line arguments displays the instructions:
 
-``python -m nwbindexer.speed_check``
+$ ``python -m nwbindexer.speed_check``
 
-Output is:::
+Output is:
+
+.. code:: none
 
    Usage: /.../speed_check.py ( i | - | <query> ) [ <data_dir> [ <java_tool_dir> ] ]
     First parameter required:
@@ -26,15 +30,21 @@ Output is:::
        If <java_tool_dir> not specified, uses: /Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
 
 
-The source of the script (file ``speed_check.py``) can be edited to change the default directory for the <java_tool_dir>.
+The source of the script (file *speed_check.py*) can be edited to change the defaults for *<data_dir>* and *<java_tool_dir>*.
 
 
-An example run of the tool and the final output is shown below.
+An example run of the tool and the final output is shown below.  A line with three dots ( ... ) indicates lines that were removed
+from the output shown here to reduce the length.  The actual outout is over 41,000 lines because
+some of the queries return lots of results.  The Java tool may actually be faster than shown in the results listed at the
+end because the version of the Java tool run may not be configured to run as fast as possible (logging has not been
+turned off).
 
 
-$ python -m nwbindexer.speed_check - ../../sample_data
+$ ``python -m nwbindexer.speed_check - ../../sample_data``
 
-Output::
+Output:
+
+.. code:: none
    
    # A
    
@@ -106,9 +116,6 @@ Output::
    
    
    Time, user=0.3968, sys=0.0924, total=0.4892
-   # G
-   # Don't include this because there are so many groups found in the Churchland dataset
-   # *:(neurodata_type == "RoiResponseSeries")
    
    Queries in test:
    A. epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
@@ -119,10 +126,9 @@ Output::
    F. general/optophysiology/*: (excitation_lambda)
    timing results are:
    qid	java	search_nwb	query_index
-   A	14.2398	23.6527	2.1972
-   B	50.8242	74.5105	1.0670
-   C	16.8795	27.2111	0.5328
-   D	2.2005	0.5240	0.4821
-   E	1.8188	0.5704	0.4783
-   F	1.7239	0.6262	0.4892
-   
+   A      16.4115 21.9389		1.9645
+   B      49.9601 92.4630		1.4372
+   C      21.0267 28.3272		0.5513
+   D      2.1893  0.5208		0.5281
+   E      1.7935  0.6196		0.4885
+   F      2.0566  0.6860		0.5569

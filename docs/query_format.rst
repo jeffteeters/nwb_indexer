@@ -24,33 +24,27 @@ Queries are specified using the following format (BNF Grammar):::
 
 In the grammar: square brakets `[ ]` indicate optional contents, `( )*` indicates zero or more, `( x | y )` indicates `x` or `y` and:
 
-`<parent>`
+<parent>
      is a path to an HDF5 group or dataset. The path can contain asterisk (*) characters which match
-     zero or more charaters (e.g. '*' functions as a wildcard). 
+     zero or more charaters (e.g. "*" functions as a wildcard). 
 
-`<string>`
+<child>
+     is the name of an HDF5 attribute or dataset within the parent.
+
+<string>
      is a string constant enclosed in single or double quotes (with a backslash used to escape quotes).
      Any string constant used with LIKE must have wildcards ("%" or "_") explicitly included (if no wildcards are
      included, the query does an exact match).
 
-`<number>`
+<number>
      is a numeric constant. 
 
-`<child>`
-     is the name of an HDF5 attribute or dataset within the parent.
-
-`<string>`
-     is a string constant enclosed in single or double quotes with a backslash used to escape the strings.
-
-`<number>`
-     is a numeric constant.
-
-
-Some example queries:
+Some example queries and a description of what they do is given below.
+(It may be necessary to scroll to the right to see the descriptions).
 
 .. csv-table::
    :header: "Query", "Description"
-   :widths: 35, 25
+   :widths: 20, 25
 
    "/general/subject: (species == ""Mus musculus"")",   "Selects all files with the specified species"
    "/general:(virus)",                                  "Selects all records with a virus dataset"
