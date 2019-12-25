@@ -45,7 +45,7 @@ The list of files (in the index file, e.g. *nwb_index.db*) used in the
 This list was displayed by running the *query_index.py* program in interactive
 mode in the dirctory containing file *nwb_index.db*.
 
-.. code:: none
+.. code-block:: none
 
 
    $ query_nwbindex ./
