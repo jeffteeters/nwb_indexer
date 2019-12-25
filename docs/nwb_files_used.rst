@@ -47,6 +47,7 @@ mode in the dirctory containing file *nwb_index.db*.
 
 .. code:: none
 
+
    $ query_nwbindex ./
    Using index_path: './nwb_index.db'
    Opening './nwb_index.db'
@@ -123,3 +124,6 @@ mode in the dirctory containing file *nwb_index.db*.
    70. ./tutorials_general/test_multicontainerinterface.nwb
    Enter query, control-d to quit
    > 
+
+End of file.
+
