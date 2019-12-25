@@ -44,8 +44,6 @@ $ ``python -m nwbindexer.speed_check - ../../sample_data``
 Output:
 
 .. code:: none
-
-   
    
    # A
    

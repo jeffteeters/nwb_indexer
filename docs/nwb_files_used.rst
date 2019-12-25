@@ -46,7 +46,7 @@ This list was displayed by running the *query_index.py* program in interactive
 mode in the dirctory containing file *nwb_index.db*.
 
 .. code:: none
-   
+
    $ query_nwbindex ./
    Using index_path: './nwb_index.db'
    Opening './nwb_index.db'
