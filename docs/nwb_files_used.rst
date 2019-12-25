@@ -124,6 +124,3 @@ mode in the dirctory containing file *nwb_index.db*.
    70. ./tutorials_general/test_multicontainerinterface.nwb
    Enter query, control-d to quit
    > 
-
-End of file.
-
