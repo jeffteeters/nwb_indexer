@@ -8,20 +8,25 @@ This sections lists the NWB files used for the :ref:`speed_check.py <speed_check
 utility example run which has partial output given in the previous section.  The
 files used are:
 
-* The first 16 files from the alm-1 data set at CRCNS.org, which contains anterior motor
-  cortex recordings from the Svoboda Lab at Janelia Farm.14 (2.2 GB).
-  http://crcns.org/data-sets/motor-cortex/alm-1
-
 * A data file from the Frank Lab at UCSF. (2.2GB total).  File name: *Bon04.nwb*.
   Instructions and code for generating this file from an original file at CRCNS.org are at:
   https://github.com/LorenFrankLab/franklab-nwb-hack/tree/master/hackathon-6
-  This file was available on DropBox using a link that was given on the above page, but
-  that link is currently not working, so the file may need to be regenerated.  It was not used in
-  any of the queries used in the *speed_check.py* sample run in the previous section, so
-  it is probably not needed for the *speed_check.py* results.
+  There is a link on that page for downloading the file from Dropbox, but
+  that link is currently not working.  So, if this file was to be included in a future
+  run it may need to be regenerated.  It was not used in any of the queries used in
+  the *speed_check.py* sample run in the previous section, so it is probably not needed
+  for the *speed_check.py* results.
+
+* File: *Steinmetz2019_Forssmann_2017-11-05.nwb* (267.96 MB).
+  From an NWB-formatted dataset referenced in Steinmetz et al. Nature 2019.
+  Available at: https://figshare.com/articles/Datasets_from_Steinmetz_et_al_2019_in_NWB_format/11274968
 
 * A data file from Buzsaki Lab. File: *YutaMouse41-150903.nwb* (10 GB).  It is available from
   https://buzsakilab.nyumc.org/datasets/NWB/SenzaiNeuron2017/
+
+* The first 16 files from the alm-1 data set at CRCNS.org, which contains anterior motor
+  cortex recordings from the Svoboda Lab at Janelia Farm.14 (2.2 GB).
+  http://crcns.org/data-sets/motor-cortex/alm-1
 
 * Files in file *nwb_1_28.zip* from the Anne K Churchland lab.17 (28 files, 17 GB).
   Available from: http://labshare.cshl.edu/shares/library/repository/37693/
@@ -35,85 +40,86 @@ files used are:
   https://pynwb.readthedocs.io/en/latest/tutorials/index.html
 
 
-The list of files included in the index file (file *nwb_index.db*) used for the
-*speed_check.py* sample run are given below.  This list is shown by the output
-of the *query_index.py* example run:
+The list of files (in the index file, e.g. *nwb_index.db*) used in the 
+:ref:`speed_check.py example run <speed_check>` is given below.
+This list was displayed by running the *query_index.py* program in interactive
+mode in the dirctory containing file *nwb_index.db*.
 
 .. code:: none
-
-   $ python -m nwbindexer.query_index ./
+   
+   $ query_nwbindex ./
    Using index_path: './nwb_index.db'
    Opening './nwb_index.db'
    Searching 70 files:
-   1. ./YutaMouse41-150903.nwb
-   2. ./bon04.nwb
-   3. ./churchland/mouse1_fni16_150817_001_ch2-PnevPanResults-170808-190057.nwb
-   4. ./churchland/mouse1_fni16_150818_001_ch2-PnevPanResults-170808-180842.nwb
-   5. ./churchland/mouse1_fni16_150819_001_ch2-PnevPanResults-170815-163235.nwb
-   6. ./churchland/mouse1_fni16_150820_001_ch2-PnevPanResults-170808-185044.nwb
-   7. ./churchland/mouse1_fni16_150821_001-002_ch2-PnevPanResults-170808-184141.nwb
-   8. ./churchland/mouse1_fni16_150825_001-002-003_ch2-PnevPanResults-170814-191401.nwb
-   9. ./churchland/mouse1_fni16_150826_001_ch2-PnevPanResults-170808-002053.nwb
-   10. ./churchland/mouse1_fni16_150827_001_ch2-PnevPanResults-170807-171156.nwb
-   11. ./churchland/mouse1_fni16_150828_001-002_ch2-PnevPanResults-170807-204746.nwb
-   12. ./churchland/mouse1_fni16_150831_001-002_ch2-PnevPanResults-170807-193348.nwb
-   13. ./churchland/mouse1_fni16_150901_001_ch2-PnevPanResults-170807-072732.nwb
-   14. ./churchland/mouse1_fni16_150903_001_ch2-PnevPanResults-170809-075033.nwb
-   15. ./churchland/mouse1_fni16_150904_001_ch2-PnevPanResults-170809-073123.nwb
-   16. ./churchland/mouse1_fni16_150915_001_ch2-PnevPanResults-170806-163508.nwb
-   17. ./churchland/mouse1_fni16_150916_001-002_ch2-PnevPanResults-170806-114920.nwb
-   18. ./churchland/mouse1_fni16_150917_001_ch2-PnevPanResults-170806-110934.nwb
-   19. ./churchland/mouse1_fni16_150918_001-002-003-004_ch2-PnevPanResults-170715-124821.nwb
-   20. ./churchland/mouse1_fni16_150921_001_ch2-PnevPanResults-170715-114212.nwb
-   21. ./churchland/mouse1_fni16_150922_001_ch2-PnevPanResults-170715-120548.nwb
-   22. ./churchland/mouse1_fni16_150923_001_ch2-PnevPanResults-170715-124558.nwb
-   23. ./churchland/mouse1_fni16_150924_001_ch2-PnevPanResults-170715-124619.nwb
-   24. ./churchland/mouse1_fni16_150925_001-002-003_ch2-PnevPanResults-170715-164713.nwb
-   25. ./churchland/mouse1_fni16_150928_001-002_ch2-PnevPanResults-170716-002540.nwb
-   26. ./churchland/mouse1_fni16_150929_001-002_ch2-PnevPanResults-170715-205011.nwb
-   27. ./churchland/mouse1_fni16_150930_001-002_ch2-PnevPanResults-161221-134921.nwb
-   28. ./churchland/mouse1_fni16_151001_001_ch2-PnevPanResults-161220-141515.nwb
-   29. ./churchland/mouse1_fni16_151002_001-002_ch2-PnevPanResults-161221-152112.nwb
-   30. ./churchland/mouse1_fni16_151005_001-002-003-004_ch2-PnevPanResults-161221-150439.nwb
-   31. ./tutorials_general/advanced_io_example.nwb
-   32. ./tutorials_general/basic_iterwrite_example.nwb
-   33. ./tutorials_general/basic_sparse_iterwrite_compressed_example.nwb
-   34. ./tutorials_general/basic_sparse_iterwrite_example.nwb
-   35. ./tutorials_general/basic_sparse_iterwrite_largearray.nwb
-   36. ./tutorials_general/basic_sparse_iterwrite_largechunks_compressed_example.nwb
-   37. ./tutorials_general/basic_sparse_iterwrite_largechunks_example.nwb
-   38. ./tutorials_general/basic_sparse_iterwrite_multifile.nwb
-   39. ./tutorials_general/cache_spec_example.nwb
-   40. ./tutorials_general/example_file_path.nwb
-   41. ./tutorials_general/external1_example.nwb
-   42. ./tutorials_general/external2_example.nwb
-   43. ./tutorials_general/external_linkcontainer_example.nwb
-   44. ./tutorials_general/external_linkdataset_example.nwb
-   45. ./tutorials_general/processed_data.nwb
-   46. ./tutorials_general/raw_data.nwb
-   47. ./tutorials_general/scratch_analysis.nwb
-   48. ./tutorials_general/test_multicontainerinterface.nwb
-   49. ./tutorials_domain/brain_observatory.nwb
-   50. ./tutorials_domain/ecephys_example.nwb
-   51. ./tutorials_domain/icephys_example.nwb
-   52. ./tutorials_domain/ophys_example.nwb
-   53. ./steinmentz2019/Steinmetz2019_Forssmann_2017-11-05.nwb
-   54. ./nwb1/data_structure_ANM210861_20130701.nwb
-   55. ./nwb1/data_structure_ANM210861_20130702.nwb
-   56. ./nwb1/data_structure_ANM210861_20130703.nwb
-   57. ./nwb1/data_structure_ANM210862_20130626.nwb
-   58. ./nwb1/data_structure_ANM210862_20130627.nwb
-   59. ./nwb1/data_structure_ANM210862_20130628.nwb
-   60. ./nwb1/data_structure_ANM210863_20130626.nwb
-   61. ./nwb1/data_structure_ANM210863_20130627.nwb
-   62. ./nwb1/data_structure_ANM210863_20130628.nwb
-   63. ./nwb1/data_structure_ANM214427_20130805.nwb
-   64. ./nwb1/data_structure_ANM214427_20130806.nwb
-   65. ./nwb1/data_structure_ANM214427_20130807.nwb
-   66. ./nwb1/data_structure_ANM214427_20130808.nwb
-   67. ./nwb1/data_structure_ANM214429_20130805.nwb
-   68. ./nwb1/data_structure_ANM214429_20130806.nwb
-   69. ./nwb1/data_structure_ANM214429_20130807.nwb
-   70. ./tutorials_general/basic_example.nwb
-   
-
+   1. ./bon04.nwb
+   2. ./Steinmetz2019_Forssmann_2017-11-05.nwb
+   3. ./YutaMouse41-150903.nwb
+   4. ./alm-1/data_structure_ANM210861_20130701.nwb
+   5. ./alm-1/data_structure_ANM210861_20130702.nwb
+   6. ./alm-1/data_structure_ANM210861_20130703.nwb
+   7. ./alm-1/data_structure_ANM210862_20130626.nwb
+   8. ./alm-1/data_structure_ANM210862_20130627.nwb
+   9. ./alm-1/data_structure_ANM210862_20130628.nwb
+   10. ./alm-1/data_structure_ANM210863_20130626.nwb
+   11. ./alm-1/data_structure_ANM210863_20130627.nwb
+   12. ./alm-1/data_structure_ANM210863_20130628.nwb
+   13. ./alm-1/data_structure_ANM214427_20130805.nwb
+   14. ./alm-1/data_structure_ANM214427_20130806.nwb
+   15. ./alm-1/data_structure_ANM214427_20130807.nwb
+   16. ./alm-1/data_structure_ANM214427_20130808.nwb
+   17. ./alm-1/data_structure_ANM214429_20130805.nwb
+   18. ./alm-1/data_structure_ANM214429_20130806.nwb
+   19. ./alm-1/data_structure_ANM214429_20130807.nwb
+   20. ./churchland/mouse1_fni16_150817_001_ch2-PnevPanResults-170808-190057.nwb
+   21. ./churchland/mouse1_fni16_150818_001_ch2-PnevPanResults-170808-180842.nwb
+   22. ./churchland/mouse1_fni16_150819_001_ch2-PnevPanResults-170815-163235.nwb
+   23. ./churchland/mouse1_fni16_150820_001_ch2-PnevPanResults-170808-185044.nwb
+   24. ./churchland/mouse1_fni16_150821_001-002_ch2-PnevPanResults-170808-184141.nwb
+   25. ./churchland/mouse1_fni16_150825_001-002-003_ch2-PnevPanResults-170814-191401.nwb
+   26. ./churchland/mouse1_fni16_150826_001_ch2-PnevPanResults-170808-002053.nwb
+   27. ./churchland/mouse1_fni16_150827_001_ch2-PnevPanResults-170807-171156.nwb
+   28. ./churchland/mouse1_fni16_150828_001-002_ch2-PnevPanResults-170807-204746.nwb
+   29. ./churchland/mouse1_fni16_150831_001-002_ch2-PnevPanResults-170807-193348.nwb
+   30. ./churchland/mouse1_fni16_150901_001_ch2-PnevPanResults-170807-072732.nwb
+   31. ./churchland/mouse1_fni16_150903_001_ch2-PnevPanResults-170809-075033.nwb
+   32. ./churchland/mouse1_fni16_150904_001_ch2-PnevPanResults-170809-073123.nwb
+   33. ./churchland/mouse1_fni16_150915_001_ch2-PnevPanResults-170806-163508.nwb
+   34. ./churchland/mouse1_fni16_150916_001-002_ch2-PnevPanResults-170806-114920.nwb
+   35. ./churchland/mouse1_fni16_150917_001_ch2-PnevPanResults-170806-110934.nwb
+   36. ./churchland/mouse1_fni16_150918_001-002-003-004_ch2-PnevPanResults-170715-124821.nwb
+   37. ./churchland/mouse1_fni16_150921_001_ch2-PnevPanResults-170715-114212.nwb
+   38. ./churchland/mouse1_fni16_150922_001_ch2-PnevPanResults-170715-120548.nwb
+   39. ./churchland/mouse1_fni16_150923_001_ch2-PnevPanResults-170715-124558.nwb
+   40. ./churchland/mouse1_fni16_150924_001_ch2-PnevPanResults-170715-124619.nwb
+   41. ./churchland/mouse1_fni16_150925_001-002-003_ch2-PnevPanResults-170715-164713.nwb
+   42. ./churchland/mouse1_fni16_150928_001-002_ch2-PnevPanResults-170716-002540.nwb
+   43. ./churchland/mouse1_fni16_150929_001-002_ch2-PnevPanResults-170715-205011.nwb
+   44. ./churchland/mouse1_fni16_150930_001-002_ch2-PnevPanResults-161221-134921.nwb
+   45. ./churchland/mouse1_fni16_151001_001_ch2-PnevPanResults-161220-141515.nwb
+   46. ./churchland/mouse1_fni16_151002_001-002_ch2-PnevPanResults-161221-152112.nwb
+   47. ./churchland/mouse1_fni16_151005_001-002-003-004_ch2-PnevPanResults-161221-150439.nwb
+   48. ./tutorials_domain/brain_observatory.nwb
+   49. ./tutorials_domain/ecephys_example.nwb
+   50. ./tutorials_domain/icephys_example.nwb
+   51. ./tutorials_domain/ophys_example.nwb
+   52. ./tutorials_general/advanced_io_example.nwb
+   53. ./tutorials_general/basic_example.nwb
+   54. ./tutorials_general/basic_iterwrite_example.nwb
+   55. ./tutorials_general/basic_sparse_iterwrite_compressed_example.nwb
+   56. ./tutorials_general/basic_sparse_iterwrite_example.nwb
+   57. ./tutorials_general/basic_sparse_iterwrite_largearray.nwb
+   58. ./tutorials_general/basic_sparse_iterwrite_largechunks_compressed_example.nwb
+   59. ./tutorials_general/basic_sparse_iterwrite_largechunks_example.nwb
+   60. ./tutorials_general/basic_sparse_iterwrite_multifile.nwb
+   61. ./tutorials_general/cache_spec_example.nwb
+   62. ./tutorials_general/example_file_path.nwb
+   63. ./tutorials_general/external1_example.nwb
+   64. ./tutorials_general/external2_example.nwb
+   65. ./tutorials_general/external_linkcontainer_example.nwb
+   66. ./tutorials_general/external_linkdataset_example.nwb
+   67. ./tutorials_general/processed_data.nwb
+   68. ./tutorials_general/raw_data.nwb
+   69. ./tutorials_general/scratch_analysis.nwb
+   70. ./tutorials_general/test_multicontainerinterface.nwb
+   Enter query, control-d to quit
+   > 

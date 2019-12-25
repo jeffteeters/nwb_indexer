@@ -44,6 +44,8 @@ $ ``python -m nwbindexer.speed_check - ../../sample_data``
 Output:
 
 .. code:: none
+
+   
    
    # A
    
@@ -52,18 +54,18 @@ Output:
    Starting: ** java ** with: epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
    dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
    cmd:java -Djava.library.path=src/main/resources/ -jar target/nwbqueryengine-1.0-SNAPSHOT-jar-with-dependencies.jar /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data 'epochs*:(start_time>200 & stop_time<400 | stop_time>1600)'
-   Dataset: epochs/trial_011/stop_time, Value: 223.430533, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
-   Dataset: epochs/trial_010/stop_time, Value: 214.274403, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
-   Dataset: epochs/trial_018/start_time, Value: 312.970341, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   Dataset: epochs/trial_010/start_time, Value: 202.908281, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb
+   Dataset: epochs/trial_018/start_time, Value: 312.970341, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb
+   Dataset: epochs/trial_022/stop_time, Value: 372.752102, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb
    
    ...
    
-   Time, user=12.9647, sys=1.2751, total=14.2398
+   Time, user=12.2446, sys=1.3410, total=13.5856
    Starting: ** search_nwb ** with: epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
    dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
    cmd:python -m nwbindexer.search_nwb /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data 'epochs*:(start_time>200 & stop_time<400 | stop_time>1600)'
    Found 16 matching files:
-   [   {   'file': '/Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb',
+   [   {   'file': '/Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb',
            'subqueries': [   [   {   'node': '/epochs/trial_010',
                                      'vind': {   'start_time': 202.908281,
                                                  'stop_time': 214.274403},
@@ -76,16 +78,19 @@ Output:
                                      'vind': {   'start_time': 223.430533,
                                                  'stop_time': 243.704452},
                                      'vtbl': {}},
-      
+                                 {   'node': '/epochs/trial_013',
+                                     'vind': {   'start_time': 243.704452,
+                                                 'stop_time': 273.647165},
+   
    ...
    
-   Time, user=22.2331, sys=1.4197, total=23.6527
+   Time, user=18.9878, sys=0.7136, total=19.7014
    Starting: ** query_index ** with: epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
    dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
    cmd:python -m nwbindexer.query_index /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb_index.db 'epochs*:(start_time>200 & stop_time<400 | stop_time>1600)'
    Opening '/Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb_index.db'
    Found 16 matching files:
-   [   {   'file': './nwb1/data_structure_ANM210861_20130701.nwb',
+   [   {   'file': './alm-1/data_structure_ANM210861_20130701.nwb',
            'subqueries': [   [   {   'node': '/epochs/trial_010',
                                      'vind': {   'start_time': 202.908281,
                                                  'stop_time': 214.274403},
@@ -100,7 +105,7 @@ Output:
                                      'vtbl': {}},
    ...
    
-   Time, user=1.9567, sys=0.2405, total=2.1972
+   Time, user=1.5487, sys=0.1410, total=1.6897
    # B
    
    ------- query B -------
@@ -108,8 +113,9 @@ Output:
    Starting: ** java ** with: */data: (unit == "unknown")
    dir:/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
    cmd:java -Djava.library.path=src/main/resources/ -jar target/nwbqueryengine-1.0-SNAPSHOT-jar-with-dependencies.jar /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data '*/data: (unit == "unknown")'
-   Dataset: acquisition/timeseries/lick_trace/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
-   Dataset: stimulus/presentation/pole_in/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/nwb1/data_structure_ANM210861_20130701.nwb
+   Dataset: acquisition/timeseries/lick_trace/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb
+   Dataset: stimulus/presentation/pole_in/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb
+   Dataset: stimulus/presentation/pole_out/data/unit, Value: unknown, DataStorageName: /Users/jt/crcns/projects/petr_nwbqe_paper/sample_data/alm-1/data_structure_ANM210861_20130701.nwb
    
    ...
    
