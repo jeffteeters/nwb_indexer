@@ -19,24 +19,25 @@ Output is:
 
 .. code:: none
 
-   Usage: /.../speed_check.py ( i | - | <query> ) [ <data_dir> [ <java_tool_dir> ] ]
+   Usage: speed_check.py ( i | - | <query> ) [ <data_dir> [ <java_tool_dir> ] ]
     First parameter required:
-       Either one characer: 'i' - interactive mode, '-' use stored default queries
+       Either one character: 'i' - interactive mode, '-' use stored default queries
        *OR* a single query to execute; must be quoted.
     After the first parameter, optionally specify:
-       <data_dir> - directory containing nwb files AND index file ('nwb_index.db' built by build_index.py)
-       <java_tool_dir> - directory containing NWB Query Engine (java tool)
+       <data_dir> - directory containing NWB files AND index file ('nwb_index.db' built by build_index.py)
+       <java_tool_dir> - directory containing NWB Query Engine (Java tool)
        If <data_dir> not specified, uses: ../sample_data
        If <java_tool_dir> not specified, uses: /Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
 
 
-The source of the script (file *speed_check.py*) can be edited to change the defaults for *<data_dir>* and *<java_tool_dir>*.
+The source of the script (file *speed_check.py*) can be edited to change the defaults 
+for *<data_dir>* and *<java_tool_dir>*.
 
-
-An example run of the tool and the final output is shown below.  A line with three dots ( ... ) indicates lines that were removed
-from the output to reduce the length.  The actual outout is over 41,000 lines because
-some of the queries return lots of results.  The times shown in the results can vary between runs
-due to variations in the system operation (threads running, memory usage) during each run. 
+An example run of the tool and the final output is shown below.  A line with three dots ( ... )
+indicates lines that were removed from the output to reduce the length.  The actual output is over
+41,000 lines because some of the queries return lots of results.  The times shown in the results
+can vary between runs due to variations in the system operation (threads running, memory usage)
+during each run. 
 
 
 $ ``python -m nwbindexer.speed_check - ../../sample_data``

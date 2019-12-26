@@ -665,12 +665,12 @@ def main():
 	global con, value_mirror, default_dbname
 	num_parameters = len(sys.argv)
 	if num_parameters < 2 or num_parameters > 3:
-		print('Usage: %s <nwb_directory_name> [ <index_file> ]' % sys.argv[0])
+		print('Usage: %s <nwb_directory> [ <index_path> ]' % sys.argv[0])
 		print("Where:")
-		print("    <nwb_directory_name> - name of directory to scan for nwb files (extension '.nwb'")
-		print("    <index_name> - path to index file:")
-		print("         If nothing specified, uses '%s' in the current directory" % default_dbname)
-		print("         If only a directory specifed, uses '%s' in the specified directory" % default_dbname)
+		print('    <nwb_directory> - name of directory to scan for NWB files (extension ".nwb")')
+		print("    <index_path> - path to index file:")
+		print("         If nothing is specified, uses '%s' in the current directory." % default_dbname)
+		print("         If only a directory is specified, uses '%s' in the specified directory." % default_dbname)
 		sys.exit()
 	if not os.path.isdir(sys.argv[1]):
 		sys.exit('ERROR: directory %s was not found!' % sys.argv[1])

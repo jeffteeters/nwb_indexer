@@ -22,7 +22,7 @@ The source repository for nwbindexer is: https://github.com/jeffteeters/nwbindex
 A related third tool is the **NWB Query Engine**.  It is at:
 https://github.com/jezekp/NwbQueryEngine.  The two tools in nwbindexer
 use a :ref:`query format <query_format>` similar to the one used in the NWB Query Engine.
-A webpage allowing example searches using all three tools is at:
+A web page allowing example searches using all three tools is at:
 http://eeg.kiv.zcu.cz:8080/nwb-query-engine-web/.
 
 

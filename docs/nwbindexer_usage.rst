@@ -32,17 +32,16 @@ The first form (*build_nwbindex*) uses a command-line utility installed by the n
 second runs the command by specifying the python module directly.  If no arguments are entered, the usage
 information is displayed.  The arguments are:
 
-
 <nwb_directory>
-   Name of directory to scan for nwb files (extension ".nwb")
+   Name of directory to scan for NWB files (extension ".nwb")
 
 <index_path>
    Path to index file.  If nothing is specified, uses *nwb_index.db* in the current directory.
-   If only a directory is specifed, uses *nwb_index.db* in the specified directory.
+   If only a directory is specified, uses *nwb_index.db* in the specified directory.
 
 
 The command scans all the nwb files in *<nwb_directory>* (and subdirectories) and saves the
-information about small datasets and attributes in the index file (a SQLite3 database) specified by
+information about small datasets and attributes in the index file (a SQLite database) specified by
 *<index_path>*.  The default name of the index file is *nwb_index.db*.
 The program can be run multiple times with a different *<nwb_directory>*
 and the same *<index_path>* to add information about additional NWB files to the specified index.
@@ -67,8 +66,8 @@ Once the index file is built, queries can be run by entering either:
 Where:
 
    <index_path>
-       Path to sqlite3 database file or a directory or '-' for the default database (nwb_index.db).
-       If is path to a directory, then use default database (nwb_index.db) in that directory.
+       Path to SQLite database file or a directory or '-' for the default database (nwb_index.db).
+       If is path to a directory, then uses default database (nwb_index.db) in that directory.
 
    <query>
        Query to execute (optional).  If present, must be quoted.  If not present, interactive

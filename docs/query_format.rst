@@ -22,11 +22,11 @@ Queries are specified using the following format (BNF Grammar):::
     ⟨andor⟩ ::= ‘&’ | ‘|’
 
 
-In the grammar: square brakets `[ ]` indicate optional contents, `( )*` indicates zero or more, `( x | y )` indicates `x` or `y` and:
+In the grammar: square brackets `[ ]` indicate optional contents, `( )*` indicates zero or more, `( x | y )` indicates `x` or `y` and:
 
 <parent>
      is a path to an HDF5 group or dataset. The path can contain asterisk (*) characters which match
-     zero or more charaters (e.g. "*" functions as a wildcard). 
+     zero or more characters (e.g. "*" functions as a wildcard). 
 
 <child>
      is the name of an HDF5 attribute or dataset within the parent.

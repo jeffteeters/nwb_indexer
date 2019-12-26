@@ -19,7 +19,7 @@ in this section.  The datasets (nwb files) used in the examples are:
 
 In the sample queries (done with the query_index.py utility) the index file (*nwb_index.db*) is located in
 the `../../sample_data`` directory).  The output would be the same if the *search_nwb.py* utility is
-used if a directory containing the nwb files was specifed as the *<path>* in the *search_nwb* 
+used if a directory containing the nwb files was specified as the *<path>* in the *search_nwb* 
 command as described in section :ref:`search_nwb_usage`.  The format of the output is
 as described in section :ref:`format_of_query_output`.
 

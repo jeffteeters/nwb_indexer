@@ -142,10 +142,10 @@ child_names
 
 row_values
     Contains a list of tuples, each tuple contains aligned values associated with the names in *child_names*.
-    In other words, each tuple has vaues for one row of the spreadsheet in order of the header *child_names*.
+    In other words, each tuple has values for one row of the spreadsheet in order of the header *child_names*.
 
 combined
     Contains a list of JSON Objects (Python dictionaries), where each dictionary has data for one row in the returned
-    results.  That is, in each dictionary, the keys are the *child_names* (spredsheet header column names) and
-    the value for each key is the value of that child in the row.  This is another way of represening the data
+    results.  That is, in each dictionary, the keys are the *child_names* (spreadsheet header column names) and
+    the value for each key is the value of that child in the row.  This is another way of representing the data
     that are in *child_names* and *row_values*.

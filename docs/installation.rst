@@ -97,7 +97,7 @@ Test the installation (optional)
 ................................
 
 
-To test the installation (separately from the cloned files downloaded), cd to a dirctory
+To test the installation (separately from the cloned files downloaded), cd to a directory
 that does not contain the cloned nwbindexer directory, then type:
 
    $ ``pytest --pyargs nwbindexer``

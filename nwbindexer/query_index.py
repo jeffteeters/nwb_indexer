@@ -560,10 +560,11 @@ def main():
 	if arglen < 2 or arglen > 3:
 		print("Usage: python %s <index_path> [ <query> ]" % sys.argv[0])
 		print("where:")
-		print("    <index_path> = path to sqlite3 database file or '-' for default database (%s)" % default_dbname)
-		print("                   if is a directory, then use default database (%s) in that directory." % default_dbname)
-		print("    <query> = query to execute (optional).  If present, must be quoted.  If not present, interactive")
-		print("              mode is used which allows entering multiple queries interactively.")
+		print("    <index_path> - Path to SQLite database file or a directory or '-' for the default database (%s)."
+		    % default_dbname)
+		print("                   If is path to a directory, then uses default database (%s) in that directory." % default_dbname)
+		print("    <query> - Query to execute (optional).  If present, must be quoted.  If not present, interactive")
+		print("              mode is used which allows entering queries interactively.")
 		sys.exit("")
 	specified_db_path = sys.argv[1]
 	query = sys.argv[2] if arglen == 3 else None
