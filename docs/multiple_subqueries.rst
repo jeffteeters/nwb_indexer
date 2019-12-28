@@ -26,14 +26,14 @@ as described in section :ref:`format_of_query_output`.
 
 Query:
 
-.. code:: text
+.. code-block:: none
 
    $ python -m nwbindexer.query_index ../../sample_data '/general/subject: (age LIKE "%3 months 16 days%" & species LIKE "%Mus musculu%") & /:file_create_date LIKE "%2017-04%" & /epochs/* : start_time < 15'
 
 
 Output is:
 
-.. code:: none
+.. code-block:: none
 
    Using index_path: '../../sample_data/nwb_index.db'
    Opening '../../sample_data/nwb_index.db'
@@ -66,14 +66,14 @@ Output is:
 
 Query:
 
-.. code:: text
+.. code-block:: none
 
    python -m nwbindexer.query_index ../../sample_data 'intervals/trials: id, visual_stimulus_time, visual_stimulus_left_contrast == 0.25 & visual_stimulus_right_contrast == 0.25'
 
 
 Output:
 
-.. code:: none
+.. code-block:: none
 
    Using index_path: '../../sample_data/nwb_index.db'
    Opening '../../sample_data/nwb_index.db'

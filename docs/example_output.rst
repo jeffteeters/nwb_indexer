@@ -18,13 +18,14 @@ Command entered:
 
 Output is:
 
-.. code:: none
+.. code-block:: none
 
-    Creating database 'nwb_index.db'
-    scanning directory ./
-    Scanning file 1: ./basic_example.nwb
-    Scanning file 2: ./ecephys_example.nwb
-    Scanning file 3: ./ophys_example.nwb
+   Creating database 'nwb_index.db'
+   scanning directory ./
+   Scanning file 1: ./ecephys_example.nwb
+   Scanning file 2: ./example_file_path.nwb
+   Scanning file 3: ./ophys_example.nwb
+
 
 (results in creating file *nwb_index.db*).
 
@@ -39,15 +40,15 @@ Query entered:
 
 Output:
 
-.. code:: none
+.. code-block:: none
 
-    Using index_path: 'nwb_index.db'
-    Opening 'nwb_index.db'
-    Found 1 matching files:
-    [   {   'file': './ophys_example.nwb',
-            'subqueries': [   [   {   'node': '/general/optophysiology/my_imgpln',
-                                      'vind': {'excitation_lambda': 600.0},
-                                      'vtbl': {}}]]}]
+   Using index_path: 'nwb_index.db'
+   Opening 'nwb_index.db'
+   Found 1 matching files:
+   [   {   'file': './ophys_example.nwb',
+           'subqueries': [   [   {   'node': '/general/optophysiology/my_imgpln',
+                                     'vind': {'excitation_lambda': 600.0},
+                                     'vtbl': {}}]]}]
 
 Query:
 
@@ -55,16 +56,16 @@ Query:
 
 Output:
 
-.. code:: none
+.. code-block:: none
 
-    Using index_path: 'nwb_index.db'
-    Opening 'nwb_index.db'
-    Found 1 matching files:
-    [   {   'file': './ecephys_example.nwb',
-            'subqueries': [   [   {   'node': '/general/extracellular_ephys/tetrode1',
-                                      'vind': {   'location': 'somewhere in the '
-                                                              'hippocampus'},
-                                      'vtbl': {}}]]}]
+   Using index_path: 'nwb_index.db'
+   Opening 'nwb_index.db'
+   Found 1 matching files:
+   [   {   'file': './ecephys_example.nwb',
+           'subqueries': [   [   {   'node': '/general/extracellular_ephys/tetrode1',
+                                     'vind': {   'location': 'somewhere in the '
+                                                             'hippocampus'},
+                                     'vtbl': {}}]]}]
 
 Query:
 
@@ -72,23 +73,23 @@ Query:
 
 Output:
 
-.. code:: none
+.. code-block:: none
 
-    Using index_path: 'nwb_index.db'
-    Opening 'nwb_index.db'
-    Found 1 matching files:
-    [   {   'file': './basic_example.nwb',
-            'subqueries': [   [   {   'node': '/units',
-                                      'vind': {},
-                                      'vtbl': {   'child_names': [   'id',
-                                                                     'location',
-                                                                     'quality'],
-                                                  'combined': [   {   'id': 2,
-                                                                      'location': 'CA3',
-                                                                      'quality': 0.85}],
-                                                  'row_values': [   (   2,
-                                                                        'CA3',
-                                                                        0.85)]}}]]}]
+   Using index_path: 'nwb_index.db'
+   Opening 'nwb_index.db'
+   Found 1 matching files:
+   [   {   'file': './example_file_path.nwb',
+           'subqueries': [   [   {   'node': '/units',
+                                     'vind': {},
+                                     'vtbl': {   'child_names': [   'id',
+                                                                    'location',
+                                                                    'quality'],
+                                                 'combined': [   {   'id': 2,
+                                                                     'location': 'CA3',
+                                                                     'quality': 0.85}],
+                                                 'row_values': [   (   2,
+                                                                       'CA3',
+                                                                       0.85)]}}]]}]
 
 .. index:: Query output format
 
@@ -109,43 +110,43 @@ with keys *file* and *subqueries*.
 The value associate with the *file* key is the full path to the NWB file.  The value of the *subqueries* key is an
 array of subquery results:
 
-    [ *<subquery 1 result>*, *<subquery 2 result>*, ... ]
+   [ *<subquery 1 result>*, *<subquery 2 result>*, ... ]
 
 Each *<subquery N result>* is a list of *<node results>* for that subquery:
 
-    [ *<node 1 result>*, *<node 2 result>*, ... ]
+   [ *<node 1 result>*, *<node 2 result>*, ... ]
 
 Each *<node N result>* is a dictionary giving information about the parent node (location in the HDF5 / NWB file,
 and child nodes (groups, attributes or datasets directly within the parent) that are referenced in the subquery.  The dictionary has keys:
 
 node
-    The path to the parent node (group or dataset) withing the HDF5 file.
+   The path to the parent node (group or dataset) withing the HDF5 file.
 
 vind
-    Values for 'individual' children of the node, that is, children that are not part of a NWB DynamicTable (described below).
-    The values are provided in a JSON object (Python dictionary) where the keys are the name of each child and the
-    values are the values stored in the child.
+   Values for 'individual' children of the node, that is, children that are not part of a NWB DynamicTable (described below).
+   The values are provided in a JSON object (Python dictionary) where the keys are the name of each child and the
+   values are the values stored in the child.
 
 vtbl
-    Values for children that are part of a NWB DynamicTable.  An NWB DynamicTable is a method used within the NWB format
-    to store tabular data that are aligned along the rows, like a spreadsheet.  It is described at:
-    https://nwb-schema.readthedocs.io/en/latest/format.html#sec-dynamictable.  The value of *vtbl* is described
-    in the next section.
+   Values for children that are part of a NWB DynamicTable.  An NWB DynamicTable is a method used within the NWB format
+   to store tabular data that are aligned along the rows, like a spreadsheet.  It is described at:
+   https://nwb-schema.readthedocs.io/en/latest/format.html#sec-dynamictable.  The value of *vtbl* is described
+   in the next section.
 
 
 The value of *vtbl* is a JSON Object (Python dictionary) with keys: *child_names*, *row_values* and *combined*.
 They have the following meaning:
 
 child_names
-    A tuple listing all of the children.  This is equivalent to the header row in a spreadsheet which lists in order,
-    the columns in the spreadsheet.
+   A tuple listing all of the children.  This is equivalent to the header row in a spreadsheet which lists in order,
+   the columns in the spreadsheet.
 
 row_values
-    Contains a list of tuples, each tuple contains aligned values associated with the names in *child_names*.
-    In other words, each tuple has values for one row of the spreadsheet in order of the header *child_names*.
+   Contains a list of tuples, each tuple contains aligned values associated with the names in *child_names*.
+   In other words, each tuple has values for one row of the spreadsheet in order of the header *child_names*.
 
 combined
-    Contains a list of JSON Objects (Python dictionaries), where each dictionary has data for one row in the returned
-    results.  That is, in each dictionary, the keys are the *child_names* (spreadsheet header column names) and
-    the value for each key is the value of that child in the row.  This is another way of representing the data
-    that are in *child_names* and *row_values*.
+   Contains a list of JSON Objects (Python dictionaries), where each dictionary has data for one row in the returned
+   results.  That is, in each dictionary, the keys are the *child_names* (spreadsheet header column names) and
+   the value for each key is the value of that child in the row.  This is another way of representing the data
+   that are in *child_names* and *row_values*.
