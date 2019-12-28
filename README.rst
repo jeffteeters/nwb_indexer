@@ -1,6 +1,5 @@
-==========================
- nwbindexer and search_nwb
-==========================
+nwbindexer and search_nwb
+=========================
 
 This repository contains two tools for searching within NWB (HDF5) files:
 
@@ -17,13 +16,13 @@ Documentation for nwbindexer is at: https://nwbindexer.readthedocs.io
 
 
 Installation & Usage
-====================
+--------------------
 
 Instructions for installation and usage are at:
 https://nwbindexer.readthedocs.io
 
 License
-=======
+-------
 
 License terms are in file ``license.txt`` (reproduced below).
 

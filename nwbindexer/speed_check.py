@@ -54,8 +54,10 @@ def make_tools_cmd(data_dir, index_file_path, java_tool_dir, java_cmd):
 	# creates list of tools and info about tools (command line and directory for running the tool)
 	global java_cmd_prefix, tools_cmd, tools
 	tools_cmd = []
+#	tools_cmd.append({"name": "search_nwb", "cmd": "python -m nwbindexer.search_nwb " + data_dir})
 	if java_tool_dir is not None:
 		tools_cmd.append({"name": "java", "cmd": java_cmd_prefix + data_dir, "dir": java_tool_dir})
+#	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
 	tools_cmd.append({"name": "search_nwb", "cmd": "python -m nwbindexer.search_nwb " + data_dir})
 	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
     # tools has list of tool names

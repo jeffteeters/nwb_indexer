@@ -7,9 +7,30 @@
 Installation
 ============
 
+Install release from TestPyPI
+-----------------------------
+
+.. note::
+
+   This method (Install from `TestPyPI <https://test.pypi.org/>`_) is setup temporarily for testing.
+   When the package is uploaded to PyPI (below), this method will be removed.  It is setup
+   now because the PyPI method (below) is not yet ready.
+
+..
+
+   To install using `TestPyPI <https://test.pypi.org/>`_ run:
+
+   $ ``pip install -i https://test.pypi.org/simple/ nwbindexer``
+
 
 Install release from PyPI
 -------------------------
+
+.. warning::
+
+   The PyPI installation method is not yet ready.  Use either TestPyPI (above)
+   or Install from Git repository (below).
+
 
 The `Python Package Index (PyPI) <https://pypi.org>`_ is a repository of software for the
 Python programming language.  To install or update nwbindexer from PyPI run:

@@ -10,7 +10,7 @@ import shutil
 import importlib
 
 test_data_dir = os.path.dirname(__file__)  # should be ".../nwbindexer/test"
-basic_path = os.path.join(test_data_dir, "basic_example.nwb")
+basic_path = os.path.join(test_data_dir, "example_file_path.nwb") # was originally "basic_example.nwb"
 ecephys_path = os.path.join(test_data_dir, "ecephys_example.nwb")
 ophys_path = os.path.join(test_data_dir, "ophys_example.nwb")
 index_file = "nwb_index.db"
@@ -57,7 +57,7 @@ scanning directory %s
 Scanning file 1: %s
 Scanning file 2: %s
 Scanning file 3: %s
-""" % (index_file_path, test_data_dir, basic_path, ecephys_path, ophys_path)
+""" % (index_file_path, test_data_dir, ecephys_path, basic_path, ophys_path)
 	output = run_command(cmd)
 	assert output == expected_output
 
