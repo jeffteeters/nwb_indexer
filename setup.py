@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
 
 setuptools.setup(
     name="nwbindexer",
-    version="0.1.0",
+    version="0.1.1",
     author="Jeff Teeters",
     author_email="jeff@teeters.us",
     description="Two tools for searching NWB files",
