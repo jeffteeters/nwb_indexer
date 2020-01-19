@@ -8,6 +8,9 @@ import subprocess
 import readline
 import resource
 
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
+
 # python_tools_dir = os.getcwd()  # assumes this is running in same directory contaiing this file (speed_check.py)
 
 
@@ -44,6 +47,18 @@ general:(virus LIKE "%infectionLocation: M2%")
 # F
 general/optophysiology/*: (excitation_lambda)
 """
+
+default_queries = """
+# A
+general/subject: (subject_id == "anm00210863") & epochs/*: (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
+# B
+units: (id > -1 & location == "CA3" & quality > 0.8)
+# C
+general:(virus LIKE "%infectionLocation: M2%")
+# D
+general/optophysiology/*: (excitation_lambda)
+"""
+
 # G
 # Don't include this because there are so many groups found in the Churchland dataset
 # *:(neurodata_type == "RoiResponseSeries")
@@ -64,16 +79,21 @@ def make_tools_cmd(data_dir, index_file_path, java_tool_dir, java_cmd):
 	tools = [tools_cmd[i]["name"] for i in range(len(tools_cmd))]
 
 
-def run_query(query):
+def run_query(query, run_number, order):
 	# run query on all three tools, returns times as a triple (one for each tool)
+	# order is a string of digits indicating the order to run the queries
 	global tools_cmd, cwd
-	times = []
-	for tool_info in tools_cmd:
+	# list to store execution times
+	times = [None, None, None]
+	# convert order to list of ints
+	order = list(map(int, list(order)))
+	for tool_num in order:
+		tool_info = tools_cmd[tool_num]
 		tool = tool_info["name"]
 		cmd = tool_info["cmd"] + " '" + query + "'"
 		if "dir" in tool_info and tool_info["dir"] is not None:
 			os.chdir(tool_info["dir"])
-		print("Starting: ** %s ** with: %s" % (tool, query,) )
+		print("** Starting run %s, %s with: %s" % (run_number, tool, query,) )
 		print("dir:%s" % os.getcwd())
 		print("cmd:%s" % cmd)
 		who= resource.RUSAGE_CHILDREN
@@ -92,17 +112,19 @@ def run_query(query):
 			print(error_output)
 			sys.exit("aborting.")
 		print("Time, user={:.4f}, sys={:.4f}, total={:.4f}".format(time_user, time_sys, time_total))
-		times.append(time_total)
+		times[tool_num] = time_total
 	# change back to original directory in case directory changed
 	os.chdir(cwd)
 	return times
 
-def run_default_queries():
-	global default_queries, tools
+alpha = "ABCDEFGHIJKLMNOP"
+
+def run_default_queries(run_number, order):
+	# run default queries once, in the order specified.  Order is a string of digits.
+	global default_queries, tools, query_display, alpha
 	results = []
 	results.append(tools)  # heading of output table
 	queries = []  # for storing actual queries (without blank lines or comments)
-	alpha = "ABCDEFGHIJKLMNOP"
 	for line in default_queries.split("\n"):
 		if line == "" or line[0] == "#":
 			# skip blanks lines or comments
@@ -112,16 +134,35 @@ def run_default_queries():
 		print("\n------- query %s -------\n%s" % (query_code, line))
 		query = line
 		queries.append(query)
-		times = run_query(query)
+		times = run_query(query, run_number, order)
 		results.append(times)
 	# display final timing results
+	return [results, queries]
+
+def run_default_queries_repetitions(num_runs):
+	# run the default queries num_runs times, average the results
+	global alpha
+	rep_results = []
+	# order specifies the order each query is executed, done to have different orders in case that matters
+	# for the timeing due to caches
+	orders = ["012", "021", "102", "120", "201", "210"]
+	for run_number in range(num_runs):
+		order = orders[ run_number % len(orders) ]
+		results, queries = run_default_queries(run_number, order)
+		rep_results.append(results)
+	# display results
 	print("Queries in test:")
 	for i in range(len(queries)):
 		print("%s. %s" % (alpha[i], queries[i]))
 	print("timing results are:")
-	print("\t".join(["qid",] + results[0]))
-	for i in range(1,len(results)):
-		print("{}\t{:.4f}\t{:.4f}\t{:.4f}".format(alpha[i-1], results[i][0], results[i][1], results[i][2]))
+	pp.pprint(rep_results)
+
+# def display_
+# 	print("\t".join(["qid",] + results[0]))
+# 	for i in range(1,len(results)):
+# 		print("{}\t{:.4f}\t{:.4f}\t{:.4f}".format(alpha[i-1], results[i][0], results[i][1], results[i][2]))
+
+
 
 def run_single_query(query):
 	global tools
@@ -141,10 +182,11 @@ def do_interactive_queries():
 
 def display_instructions():
 	global default_java_tool_dir, default_data_dir, index_file_name
-	print("Usage: %s ( i | - | <query> ) [ <data_dir> [ <java_tool_dir> ] ]" % sys.argv[0])
-	print(" First parameter required:")
-	print("    Either one character: 'i' - interactive mode, '-' use stored default queries")
-	print("    *OR* a single query to execute; must be quoted.")
+	print("Usage: %s ( i | <ndq> | <query> ) [ <data_dir> [ <java_tool_dir> ] ]" % sys.argv[0])
+	print(" First parameter required, either:")
+	print("    'i' - interactive mode (user enters queries interactively).")
+	print("    <ndq> - an integer, number of times to run default queries.  Times for runs are averaged.")
+	print("    <query> - a single query to execute; must be quoted.")
 	print(" After the first parameter, optionally specify:")
 	print("    <data_dir> - directory containing NWB files AND index file ('%s' built by build_index.py)" % index_file_name)
 	print("    <java_tool_dir> - directory containing NWB Query Engine (Java tool)")
@@ -176,8 +218,9 @@ def main():
 	make_tools_cmd(data_dir, index_file_path, java_tool_dir, java_cmd)
 	if sys.argv[1] == "i":
 		do_interactive_queries()
-	elif sys.argv[1] == "-":
-		run_default_queries()
+	elif sys.argv[1].isdigit():
+		num_runs = int(sys.argv[1])
+		run_default_queries_repetitions(num_runs)
 	elif sys.argv[1][0] not in ('"', "'"):
 		display_instructions()
 	else:
