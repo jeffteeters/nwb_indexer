@@ -15,7 +15,7 @@ files used are:
 
 * A data file from Buzsaki Lab. File: *YutaMouse41-150903.nwb* (10 GB).  It is available from
   https://buzsakilab.nyumc.org/datasets/NWB/SenzaiNeuron2017/
-  MD5: 43026d1bfd0b536cf9dbdedd0fecf561
+  MD5: 3dd2251ba2c61abb9edae1117bbaecf0
 
 * The first 16 files from the alm-1 data set at CRCNS.org, which contains anterior motor
   cortex recordings from the Svoboda Lab at Janelia Farm. (Total 2.2 GB).

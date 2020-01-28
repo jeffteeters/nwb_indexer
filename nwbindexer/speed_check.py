@@ -7,6 +7,12 @@ import subprocess
 # import re
 import readline
 import resource
+import copy
+
+# for generating plot of timing results
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -15,7 +21,7 @@ pp = pprint.PrettyPrinter(indent=4)
 
 
 # default values for command-line arguments
-default_java_tool_dir = "/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4"
+default_java_tool_dir = "/Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine5"
 # directory containg nwb files and also the index file (nwb_index.db) built by build_index.py
 default_data_dir = "../sample_data"
 
@@ -59,6 +65,21 @@ general:(virus LIKE "%infectionLocation: M2%")
 general/optophysiology/*: (excitation_lambda)
 """
 
+default_queries = """
+# A
+epochs*:(start_time>200 & stop_time<250 | stop_time>4850)
+# B
+*/data: (unit == "unknown")
+# C
+general/subject: (subject_id == "anm00210863") & epochs/*: (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
+# D
+units: (id > -1 & location == "CA3" & quality > 0.8)
+# E
+general:(virus LIKE "%infectionLocation: M2%")
+# F
+general/optophysiology/*: (excitation_lambda)
+"""
+
 # G
 # Don't include this because there are so many groups found in the Churchland dataset
 # *:(neurodata_type == "RoiResponseSeries")
@@ -75,11 +96,11 @@ def make_tools_cmd(data_dir, index_file_path, java_tool_dir, java_cmd):
 #	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
 	tools_cmd.append({"name": "search_nwb", "cmd": "python -m nwbindexer.search_nwb " + data_dir})
 	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
-    # tools has list of tool names
+	# tools has list of tool names
 	tools = [tools_cmd[i]["name"] for i in range(len(tools_cmd))]
 
 
-def run_query(query, run_number, order):
+def run_query(query, run_number=1, order="012"):
 	# run query on all three tools, returns times as a triple (one for each tool)
 	# order is a string of digits indicating the order to run the queries
 	global tools_cmd, cwd
@@ -156,13 +177,126 @@ def run_default_queries_repetitions(num_runs):
 		print("%s. %s" % (alpha[i], queries[i]))
 	print("timing results are:")
 	pp.pprint(rep_results)
+	# calculate average results
+	num_reps = len(rep_results)
+	ave_results = copy.deepcopy(rep_results[0])
+	num_queries = len(ave_results)
+	num_tools = len(ave_results[0])
+	assert num_tools == 3
+	for run_index in range(1, num_reps):
+		for query_index in range(1, num_queries):
+			for tool_index in range(num_tools):
+				ave_results[query_index][tool_index] += rep_results[run_index][query_index][tool_index]
+	# divide by number of runs to get average
+	for query_index in range(1, num_queries):
+			for tool_index in range(num_tools):
+				ave_results[query_index][tool_index] /= num_reps
+	print("average results are:")
+	pp.pprint(ave_results)
+	make_plot(ave_results)
+	# compute average time per tool
+	total_time_per_tool = [0.0, 0.0, 0.0]
+	for tool_index in range(num_tools):
+		for query_index in range(1, num_queries):
+			total_time_per_tool[tool_index] += ave_results[query_index][tool_index]
+	ave_time_per_tool = [total_time_per_tool[i] / float(num_queries) for i in range(num_tools)]
+	tool_names = ave_results[0]
+	print("average time per tool:")
+	pp.pprint(tool_names)
+	pp.pprint(ave_time_per_tool)
+	plot_ave_time_per_tool(tool_names, ave_time_per_tool)
 
-# def display_
-# 	print("\t".join(["qid",] + results[0]))
-# 	for i in range(1,len(results)):
-# 		print("{}\t{:.4f}\t{:.4f}\t{:.4f}".format(alpha[i-1], results[i][0], results[i][1], results[i][2]))
 
+def plot_ave_time_per_tool(tool_names, ave_time_per_tool):
+	# generate plot of average query time per tool
+	num_tools = len(tool_names)
+	x = np.arange(num_tools)  # the label locations
+	width = 0.75  # the width of the bars
+	fig, ax = plt.subplots()
+	rects = ax.bar(x - width/2, ave_time_per_tool, width, label=tool_names)
+	autolabel(rects, ax)
 
+	# Add some text for labels, title and custom x-axis tick labels, etc.
+	ax.set_ylabel('Average query time (sec)')
+	ax.set_title('Average time per tool')
+	ax.set_xticks(x)
+	ax.set_xticklabels(tool_names)
+	ax.legend()
+	plt.yscale("log")
+
+	fig.tight_layout()
+	plt.savefig('average_time_per_tool.pdf')
+	plt.show()
+
+def test_plot_ave_time_per_tool():
+	tool_names = ["NWB Query Engine", "search_nwb", "query_index"]
+	ave_time_per_tool = [14.376904666666668, 22.825276666666664, 0.5911126666666675]
+	plot_ave_time_per_tool(tool_names, ave_time_per_tool)
+
+def test_plotting():
+	test_results = [   ['java', 'search_nwb', 'query_index'],
+	[14.376904666666668, 22.825276666666664, 0.5911126666666675],
+	[2.0265133333333387, 0.43731499999999723, 0.4694036666666636],
+	[1.6206033333333316, 0.4567080000000023, 0.41073933333333706],
+	[1.5515750000000024, 0.5179549999999987, 0.44407033333332874]]
+	print("test results are:")
+	pp.pprint(test_results)
+	make_plot(test_results)
+
+def make_plot(ave_results):
+	# generate plot of average results
+	num_queries = len(ave_results) - 1
+	tool_names = ave_results[0]
+	num_tools = len(tool_names)
+	query_names = ["Q%s" % (i + 1) for i in range(num_queries)]
+	# convert from structure with each row containing times for one query, across all tools, e.g.:
+	# [   ['java', 'search_nwb', 'query_index'],
+	# [14.376904666666668, 22.825276666666664, 0.5911126666666675],
+	# [2.0265133333333387, 0.43731499999999723, 0.4694036666666636],
+	# [1.6206033333333316, 0.4567080000000023, 0.41073933333333706],
+	# [1.5515750000000024, 0.5179549999999987, 0.44407033333332874]]
+	# to structure with each row containing times for one tool, across all queries.  (what were columns in above)
+	tool_times = []
+	for tool_index in range(num_tools):
+		t_times = []
+		for query_index in range(num_queries):
+			t_times.append(ave_results[query_index+1][tool_index])
+		tool_times.append(t_times)
+	print("after reshaping:")
+	pp.pprint(tool_times)
+	x = np.arange(len(query_names))  # the label locations
+	width = 0.25  # the width of the bars
+	all_bars_width = width * float(num_tools)
+	fig, ax = plt.subplots()
+	# rects = []
+	for tool_index in range(num_tools):
+		offset = (width * tool_index) - (all_bars_width / 2.0) + (width / 2.0)
+		print("tool_index=%s, offset=%s, all_bars_width=%s" % (tool_index, offset, all_bars_width))
+		rects = ax.bar(x + offset, tool_times[tool_index], width, label=tool_names[tool_index])
+		autolabel(rects, ax)
+
+	# Add some text for labels, title and custom x-axis tick labels, etc.
+	ax.set_ylabel('Query times (sec)')
+	ax.set_title('Times by query and tool')
+	ax.set_xticks(x)
+	ax.set_xticklabels(query_names)
+	ax.legend()
+	plt.yscale("log")
+
+	fig.tight_layout()
+	plt.savefig('time_per_query_and_tool.pdf')
+	plt.show()
+
+def autolabel(rects, ax):
+    """Attach a text label above each bar in *rects*, displaying its height."""
+    for rect in rects:
+        height = rect.get_height()
+        sigdig = 1 if height > 10 else 2
+        ax.annotate('{}'.format(round(height,sigdig)),
+                    xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
 
 def run_single_query(query):
 	global tools
@@ -229,4 +363,6 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+	# test_plotting()
+	test_plot_ave_time_per_tool()
+	# main()
