@@ -18,17 +18,19 @@ $ ``python -m nwbindexer.speed_check``
 Output is:
 
 .. code-block:: none
-
-   Usage: speed_check.py ( i | - | <query> ) [ <data_dir> [ <java_tool_dir> ] ]
-    First parameter required:
-       Either one character: 'i' - interactive mode, '-' use stored default queries
-       *OR* a single query to execute; must be quoted.
+   
+   Usage: ../nwbindexer/speed_check.py ( i | <ndq> | <query> ) [ <data_dir> [ <java_tool_dir> ] ]
+    First parameter required, either:
+       'i' - interactive mode (user enters queries interactively).
+       <ndq> - an integer that specifies number of times to run default queries.  Times for runs are averaged.
+               It's good to use a multiple of six so all possible orders of the three tools are used.
+       <query> - a single query to execute; must be quoted.
     After the first parameter, optionally specify:
        <data_dir> - directory containing NWB files AND index file ('nwb_index.db' built by build_index.py)
        <java_tool_dir> - directory containing NWB Query Engine (Java tool)
        If <data_dir> not specified, uses: ../sample_data
-       If <java_tool_dir> not specified, uses: /Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine4
-
+       If <java_tool_dir> not specified, uses: /Users/jt/crcns/projects/petr_nwbqe_paper/NwbQueryEngine5
+   
 
 The source of the script (file *speed_check.py*) can be edited to change the defaults 
 for *<data_dir>* and *<java_tool_dir>*.
