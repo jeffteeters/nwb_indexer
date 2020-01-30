@@ -177,12 +177,47 @@ def run_default_queries_repetitions(num_runs):
 		print("%s. %s" % (alpha[i], queries[i]))
 	print("timing results are:")
 	pp.pprint(rep_results)
-	# calculate average results
-	num_reps = len(rep_results)
+	graph_rep_results(rep_results)
+
+def graph_rep_results(rep_results):
+	# calculate average results, also save min and max
+	num_runs = len(rep_results)
+	num_queries = len(rep_results[0]) - 1  # minus 1 for tool names
+	tool_names = rep_results[0][0]
+	num_tools = len(tool_names)
+	assert num_tools == 3
+	# build structure like:
+	# [ { "tool_name": <tool_name>, "query_times" <query_times> } ]
+	# where:
+	# <tool_name> - string, name of the tool,
+	# <query_times> = [  (Q1_ave, Q1_min, Q1_max), (Q2_ave, Q2_min, Q2_max), ... ]
+	tool_times = []
+	for tool_index in range(num_tools):
+		tool_name = tool_names[tool_index]
+		query_times = []
+		for query_index in range(num_queries):
+			time_sum = rep_results[0][query_index + 1][tool_index]
+			time_min = time_sum
+			time_max = time_sum
+			for run_index in range(1, num_runs):
+				val = rep_results[run_index][query_index + 1][tool_index]
+				time_sum += val
+				if val < time_min:
+					time_min = val
+				if val > time_max:
+					time_max = val
+			avg_min_max = ( time_sum / float(num_runs), time_min, time_max)
+			query_times.append(avg_min_max)
+		tool_times.append({ "tool_name": tool_name, "query_times": query_times})
+	plot_tool_times(tool_times)
+	return
+	# old plotting code below
+
+
 	ave_results = copy.deepcopy(rep_results[0])
 	num_queries = len(ave_results)
-	num_tools = len(ave_results[0])
-	assert num_tools == 3
+
+
 	for run_index in range(1, num_reps):
 		for query_index in range(1, num_queries):
 			for tool_index in range(num_tools):
@@ -206,6 +241,69 @@ def run_default_queries_repetitions(num_runs):
 	# pp.pprint(tool_names)
 	# pp.pprint(ave_time_per_tool)
 	# plot_ave_time_per_tool(tool_names, ave_time_per_tool)
+
+
+def plot_tool_times(tool_times):
+	# tool_times is a structure like:
+	# [ { "tool_name": <tool_name>, "query_times" <query_times> } ]
+	# where:
+	# <tool_name> - string, name of the tool,
+	# <query_times> = [  (Q1_ave, Q1_min, Q1_max), (Q2_ave, Q2_min, Q2_max), ... ]
+	num_queries = len(tool_times[0]["query_times"])
+	tool_names = [x["tool_name"] for x in tool_times]
+	num_tools = len(tool_names)
+	query_names = ["Q%s" % (i + 1) for i in range(num_queries)]
+
+	x = np.arange(len(query_names))*1.25  # the label locations
+	width = 0.35  # the width of the bars
+	all_bars_width = width * float(num_tools)
+	fig, ax = plt.subplots()
+	# rects = []
+	for tool_index in range(num_tools):
+		query_times = tool_times[tool_index]["query_times"]
+		offset = (width * tool_index) - (all_bars_width / 2.0) + (width / 2.0)
+		time_ave = [query_times[i][0] for i in range(len(query_times))]
+		time_min = [query_times[i][1] for i in range(len(query_times))]
+		time_max = [query_times[i][2] for i in range(len(query_times))]
+		down_error = [time_ave[i] - time_min[i] for i in range(len(time_ave))]
+		up_error = [time_max[i] - time_ave[i] for i in range(len(time_ave))]
+		print("tool: %s" % tool_names[tool_index])
+		print("time_ave: %s" % time_ave)
+		print("time_min: %s" % time_min)
+		print("time_max: %s" % time_max)
+		# print("tool_index=%s, offset=%s, all_bars_width=%s" % (tool_index, offset, all_bars_width))
+		rects = ax.bar(x + offset, time_ave, width, label=tool_names[tool_index], yerr=[down_error, up_error])
+		autolabel2(rects, ax, time_max)
+
+	# Add some text for labels, title and custom x-axis tick labels, etc.
+	ax.set_ylabel('Query times (sec)')
+	ax.set_title('Times by query and tool')
+	ax.set_xticks(x)
+	ax.set_xticklabels(query_names)
+	ax.legend()
+	plt.yscale("log")
+	# from matplotlib.ticker import ScalarFormatter
+	from matplotlib.ticker import FormatStrFormatter
+	# ax.yaxis.set_major_formatter(ScalarFormatter())
+	# from https://stackoverflow.com/questions/13511612/format-truncated-python-float-as-int-in-string
+	plt.tick_params(axis='y', which='minor')
+	ax.set_yticks([0.5, 1, 2.5, 5, 10, 20, 40, 80])
+	ax.yaxis.set_major_formatter(FormatStrFormatter("%01g"))
+	# ax.yaxis.set_minor_formatter(FormatStrFormatter("%01d"))
+	# plt.ticklabel_format(style='plain', axis='y')
+	# ax.ticklabel_format(useOffset=False, style='plain')
+	# ax.ticklabel_format(style='plain')
+	# import matplotlib.ticker as mticker
+	# ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
+	# ax.yaxis.get_major_formatter().set_scientific(False)
+	# ax.yaxis.get_major_formatter().set_useOffset(False)
+
+
+	fig.tight_layout()
+	plt.savefig('time_per_query_and_tool_test.pdf')
+	plt.show()
+
+
 
 
 # def plot_ave_time_per_tool(tool_names, ave_time_per_tool):
@@ -249,6 +347,31 @@ def test_plotting():
 	print("test results are:")
 	pp.pprint(test_results)
 	make_plot(test_results, variance)
+
+def test_plotting2():
+	rep_results = [   [   ['NWB Query Engine', 'search_nwb', 'query_index'],
+		[17.121465, 25.931048000000004, 0.8929710000000002],
+		[53.274452999999994, 81.793924, 1.1305179999999986],
+		[19.372635000000002, 30.672892999999988, 0.6211500000000179],
+		[2.5219609999999903, 0.5723900000000022, 0.5536539999999874],
+		[2.13974300000001, 0.8018010000000011, 0.5394149999999911],
+	[2.0108150000000116, 0.9465439999999958, 0.6255980000000108]],
+	[   ['NWB Query Engine', 'search_nwb', 'query_index'],
+	[16.60134299999999, 25.143021000000008, 0.9168309999999842],
+		[54.142889, 78.28330000000005, 1.1646689999999822],
+		[16.813823999999954, 29.68915600000002, 0.6607349999999883],
+		[2.43924599999999, 0.6162909999999826, 0.5709880000000425],
+		[2.109916999999996, 0.628770999999972, 0.5487640000000127],
+		[2.019654000000024, 0.7447540000000146, 0.612367999999968]],
+	[   ['NWB Query Engine', 'search_nwb', 'query_index'],
+		[16.385359999999977, 25.34464100000003, 0.7689310000000233],
+		[56.70292999999991, 80.53669400000004, 1.217979000000014],
+		[17.646947000000026, 28.355358000000024, 0.5822899999999294],
+		[2.383011000000039, 0.534860000000009, 0.530239000000023],
+		[2.0600289999999717, 0.5480499999999608, 0.519582000000014],
+		[1.7707240000000013, 0.6844410000000778, 0.5066459999999324]]]
+	graph_rep_results(rep_results)
+
 
 def make_plot(ave_results, variance=None):
 	# generate plot of average results
@@ -311,16 +434,30 @@ def make_plot(ave_results, variance=None):
 	plt.savefig('time_per_query_and_tool_test.pdf')
 	plt.show()
 
+
+def autolabel2(rects, ax, time_max):
+	"""Attach a text label above each bar in *rects*, displaying its height.
+	Get height from time_max so text is above error bar"""
+	for rect_index in range(len(rects)):
+		rect = rects[rect_index]
+		height = time_max[rect_index]
+		sigdig = 1 if height > 10 else 2
+		ax.annotate('{}'.format(round(height,sigdig)),
+					xy=(rect.get_x() + rect.get_width() / 2, height),
+					xytext=(0, 3),  # 3 points vertical offset
+					textcoords="offset points",
+					ha='center', va='bottom')
+
 def autolabel(rects, ax):
-    """Attach a text label above each bar in *rects*, displaying its height."""
-    for rect in rects:
-        height = rect.get_height()
-        sigdig = 1 if height > 10 else 2
-        ax.annotate('{}'.format(round(height,sigdig)),
-                    xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords="offset points",
-                    ha='center', va='bottom')
+	"""Attach a text label above each bar in *rects*, displaying its height."""
+	for rect in rects:
+		height = rect.get_height()
+		sigdig = 1 if height > 10 else 2
+		ax.annotate('{}'.format(round(height,sigdig)),
+					xy=(rect.get_x() + rect.get_width() / 2, height),
+					xytext=(0, 3),  # 3 points vertical offset
+					textcoords="offset points",
+					ha='center', va='bottom')
 
 def run_single_query(query):
 	global tools
@@ -387,6 +524,6 @@ def main():
 
 
 if __name__ == "__main__":
-	test_plotting()
+	test_plotting2()
 	# test_plot_ave_time_per_tool()
 	# main()
