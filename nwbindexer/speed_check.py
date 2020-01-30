@@ -14,6 +14,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+import datetime
+
+from pylab import rcParams
+# from: https://stackoverflow.com/questions/332289/how-do-you-change-the-size-of-figures-drawn-with-matplotlib
+rcParams['figure.figsize'] = 9, 5  # width, height of generated figure
+
+
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -32,39 +39,7 @@ index_file_name = "nwb_index.db"
 cwd = os.getcwd()  # current working directory
 
 
-# Queries currently in paper:
-# A) epochs:(start_time>200  &  stop_time<400  |  stop_time>1600)
-# B) */data:  (unit  ==  "unknown")
-# C)/general/subject: (subject_id == "anm00210863") & */epochs/*: (start_time > 500 & start_time < 550 &tags LIKE "%LickEarly%")
-# D)units: (id > -1 & location == "CA3" & quality > 0.8)
-# E)/general:(virusLIKE "%infectionLocation: M2%")
-
-default_queries = """
-# A
-epochs*:(start_time>200 & stop_time<400 | stop_time>1600)
-# B
-*/data: (unit == "unknown")
-# C
-general/subject: (subject_id == "anm00210863") & epochs/*: (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
-# D
-units: (id > -1 & location == "CA3" & quality > 0.8)
-# E
-general:(virus LIKE "%infectionLocation: M2%")
-# F
-general/optophysiology/*: (excitation_lambda)
-"""
-
-default_queries = """
-# A
-general/subject: (subject_id == "anm00210863") & epochs/*: (start_time > 500 & start_time < 550 & tags LIKE "%LickEarly%")
-# B
-units: (id > -1 & location == "CA3" & quality > 0.8)
-# C
-general:(virus LIKE "%infectionLocation: M2%")
-# D
-general/optophysiology/*: (excitation_lambda)
-"""
-
+# Queries in paper:
 default_queries = """
 # A
 epochs*:(start_time>200 & stop_time<250 | stop_time>4850)
@@ -80,20 +55,14 @@ general:(virus LIKE "%infectionLocation: M2%")
 general/optophysiology/*: (excitation_lambda)
 """
 
-# G
-# Don't include this because there are so many groups found in the Churchland dataset
-# *:(neurodata_type == "RoiResponseSeries")
-
 tools_cmd = None
 tools = None
 def make_tools_cmd(data_dir, index_file_path, java_tool_dir, java_cmd):
 	# creates list of tools and info about tools (command line and directory for running the tool)
 	global java_cmd_prefix, tools_cmd, tools
 	tools_cmd = []
-#	tools_cmd.append({"name": "search_nwb", "cmd": "python -m nwbindexer.search_nwb " + data_dir})
 	if java_tool_dir is not None:
 		tools_cmd.append({"name": "NWB Query Engine", "cmd": java_cmd_prefix + data_dir, "dir": java_tool_dir})
-#	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
 	tools_cmd.append({"name": "search_nwb", "cmd": "python -m nwbindexer.search_nwb " + data_dir})
 	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
 	# tools has list of tool names
@@ -210,38 +179,6 @@ def graph_rep_results(rep_results):
 			query_times.append(avg_min_max)
 		tool_times.append({ "tool_name": tool_name, "query_times": query_times})
 	plot_tool_times(tool_times)
-	return
-	# old plotting code below
-
-
-	ave_results = copy.deepcopy(rep_results[0])
-	num_queries = len(ave_results)
-
-
-	for run_index in range(1, num_reps):
-		for query_index in range(1, num_queries):
-			for tool_index in range(num_tools):
-				ave_results[query_index][tool_index] += rep_results[run_index][query_index][tool_index]
-	# divide by number of runs to get average
-	for query_index in range(1, num_queries):
-			for tool_index in range(num_tools):
-				ave_results[query_index][tool_index] /= num_reps
-	print("average results are:")
-	pp.pprint(ave_results)
-	make_plot(ave_results)
-	# compute average time per tool
-	## plan to remove following code
-	# total_time_per_tool = [0.0, 0.0, 0.0]
-	# for tool_index in range(num_tools):
-	# 	for query_index in range(1, num_queries):
-	# 		total_time_per_tool[tool_index] += ave_results[query_index][tool_index]
-	# ave_time_per_tool = [total_time_per_tool[i] / float(num_queries) for i in range(num_tools)]
-	# tool_names = ave_results[0]
-	# print("average time per tool:")
-	# pp.pprint(tool_names)
-	# pp.pprint(ave_time_per_tool)
-	# plot_ave_time_per_tool(tool_names, ave_time_per_tool)
-
 
 def plot_tool_times(tool_times):
 	# tool_times is a structure like:
@@ -253,8 +190,7 @@ def plot_tool_times(tool_times):
 	tool_names = [x["tool_name"] for x in tool_times]
 	num_tools = len(tool_names)
 	query_names = ["Q%s" % (i + 1) for i in range(num_queries)]
-
-	x = np.arange(len(query_names))*1.25  # the label locations
+	x = np.arange(len(query_names))*1.4  # the label locations
 	width = 0.35  # the width of the bars
 	all_bars_width = width * float(num_tools)
 	fig, ax = plt.subplots()
@@ -271,10 +207,8 @@ def plot_tool_times(tool_times):
 		print("time_ave: %s" % time_ave)
 		print("time_min: %s" % time_min)
 		print("time_max: %s" % time_max)
-		# print("tool_index=%s, offset=%s, all_bars_width=%s" % (tool_index, offset, all_bars_width))
 		rects = ax.bar(x + offset, time_ave, width, label=tool_names[tool_index], yerr=[down_error, up_error])
 		autolabel2(rects, ax, time_max)
-
 	# Add some text for labels, title and custom x-axis tick labels, etc.
 	ax.set_ylabel('Query times (sec)')
 	ax.set_title('Times by query and tool')
@@ -282,71 +216,18 @@ def plot_tool_times(tool_times):
 	ax.set_xticklabels(query_names)
 	ax.legend()
 	plt.yscale("log")
-	# from matplotlib.ticker import ScalarFormatter
 	from matplotlib.ticker import FormatStrFormatter
-	# ax.yaxis.set_major_formatter(ScalarFormatter())
 	# from https://stackoverflow.com/questions/13511612/format-truncated-python-float-as-int-in-string
 	plt.tick_params(axis='y', which='minor')
 	ax.set_yticks([0.5, 1, 2.5, 5, 10, 20, 40, 80])
 	ax.yaxis.set_major_formatter(FormatStrFormatter("%01g"))
-	# ax.yaxis.set_minor_formatter(FormatStrFormatter("%01d"))
-	# plt.ticklabel_format(style='plain', axis='y')
-	# ax.ticklabel_format(useOffset=False, style='plain')
-	# ax.ticklabel_format(style='plain')
-	# import matplotlib.ticker as mticker
-	# ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
-	# ax.yaxis.get_major_formatter().set_scientific(False)
-	# ax.yaxis.get_major_formatter().set_useOffset(False)
-
-
 	fig.tight_layout()
-	plt.savefig('time_per_query_and_tool_test.pdf')
+	# generate unique file name
+	now = datetime.datetime.now()
+	now_str = now.strftime("%Y-%m-%d_%H%M%S")
+	plt.savefig("speedcheck_figure_%s.pdf" % now_str)
 	plt.show()
 
-
-
-
-# def plot_ave_time_per_tool(tool_names, ave_time_per_tool):
-# 	# generate plot of average query time per tool
-# 	num_tools = len(tool_names)
-# 	x = np.arange(num_tools)  # the label locations
-# 	width = 0.75  # the width of the bars
-# 	fig, ax = plt.subplots()
-# 	rects = ax.bar(x - width/2, ave_time_per_tool, width, label=tool_names)
-# 	autolabel(rects, ax)
-
-# 	# Add some text for labels, title and custom x-axis tick labels, etc.
-# 	ax.set_ylabel('Average query time (sec)')
-# 	ax.set_title('Average time per tool')
-# 	ax.set_xticks(x)
-# 	ax.set_xticklabels(tool_names)
-# 	ax.legend()
-# 	plt.yscale("log")
-
-# 	fig.tight_layout()
-# 	plt.savefig('average_time_per_tool.pdf')
-# 	plt.show()
-
-# def test_plot_ave_time_per_tool():
-# 	tool_names = ["NWB Query Engine", "search_nwb", "query_index"]
-# 	ave_time_per_tool = [14.376904666666668, 22.825276666666664, 0.5911126666666675]
-# 	plot_ave_time_per_tool(tool_names, ave_time_per_tool)
-
-def test_plotting():
-	test_results = [   ['NWB Query Engine', 'search_nwb', 'query_index'],
-	[14.376904666666668, 22.825276666666664, 0.5911126666666675],
-	[2.0265133333333387, 0.43731499999999723, 0.4694036666666636],
-	[1.6206033333333316, 0.4567080000000023, 0.41073933333333706],
-	[1.5515750000000024, 0.5179549999999987, 0.44407033333332874]]
-	variance = [
-	[ 2.0, 4.0, .1],
-	[.2, .04, .05],
-	[.1,.06, .04],
-	[.1, .05, .04]
-	]
-	print("test results are:")
-	pp.pprint(test_results)
-	make_plot(test_results, variance)
 
 def test_plotting2():
 	rep_results = [   [   ['NWB Query Engine', 'search_nwb', 'query_index'],
@@ -373,85 +254,12 @@ def test_plotting2():
 	graph_rep_results(rep_results)
 
 
-def make_plot(ave_results, variance=None):
-	# generate plot of average results
-	num_queries = len(ave_results) - 1
-	tool_names = ave_results[0]
-	num_tools = len(tool_names)
-	query_names = ["Q%s" % (i + 1) for i in range(num_queries)]
-	# convert from structure with each row containing times for one query, across all tools, e.g.:
-	# [   ['java', 'search_nwb', 'query_index'],
-	# [14.376904666666668, 22.825276666666664, 0.5911126666666675],
-	# [2.0265133333333387, 0.43731499999999723, 0.4694036666666636],
-	# [1.6206033333333316, 0.4567080000000023, 0.41073933333333706],
-	# [1.5515750000000024, 0.5179549999999987, 0.44407033333332874]]
-	# to structure with each row containing times for one tool, across all queries.  (what were columns in above)
-	tool_times = []
-	for tool_index in range(num_tools):
-		t_times = []
-		for query_index in range(num_queries):
-			t_times.append(ave_results[query_index+1][tool_index])
-		tool_times.append(t_times)
-	# print("after reshaping:")
-	# pp.pprint(tool_times)
-	x = np.arange(len(query_names))*1.25  # the label locations
-	width = 0.35  # the width of the bars
-	all_bars_width = width * float(num_tools)
-	fig, ax = plt.subplots()
-	# rects = []
-	variance = [2.0, 0.2, 0.1, 0.11]
-	for tool_index in range(num_tools):
-		offset = (width * tool_index) - (all_bars_width / 2.0) + (width / 2.0)
-		# print("tool_index=%s, offset=%s, all_bars_width=%s" % (tool_index, offset, all_bars_width))
-		rects = ax.bar(x + offset, tool_times[tool_index], width, label=tool_names[tool_index], yerr=variance)
-		autolabel(rects, ax)
-
-	# Add some text for labels, title and custom x-axis tick labels, etc.
-	ax.set_ylabel('Query times (sec)')
-	ax.set_title('Times by query and tool')
-	ax.set_xticks(x)
-	ax.set_xticklabels(query_names)
-	ax.legend()
-	plt.yscale("log")
-	# from matplotlib.ticker import ScalarFormatter
-	from matplotlib.ticker import FormatStrFormatter
-	# ax.yaxis.set_major_formatter(ScalarFormatter())
-	# from https://stackoverflow.com/questions/13511612/format-truncated-python-float-as-int-in-string
-	plt.tick_params(axis='y', which='minor')
-	ax.set_yticks([0.5, 1, 2.5, 5, 10, 20, 40, 80])
-	ax.yaxis.set_major_formatter(FormatStrFormatter("%01g"))
-	# ax.yaxis.set_minor_formatter(FormatStrFormatter("%01d"))
-	# plt.ticklabel_format(style='plain', axis='y')
-	# ax.ticklabel_format(useOffset=False, style='plain')
-	# ax.ticklabel_format(style='plain')
-	# import matplotlib.ticker as mticker
-	# ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
-	# ax.yaxis.get_major_formatter().set_scientific(False)
-	# ax.yaxis.get_major_formatter().set_useOffset(False)
-
-
-	fig.tight_layout()
-	plt.savefig('time_per_query_and_tool_test.pdf')
-	plt.show()
-
-
 def autolabel2(rects, ax, time_max):
 	"""Attach a text label above each bar in *rects*, displaying its height.
 	Get height from time_max so text is above error bar"""
 	for rect_index in range(len(rects)):
 		rect = rects[rect_index]
 		height = time_max[rect_index]
-		sigdig = 1 if height > 10 else 2
-		ax.annotate('{}'.format(round(height,sigdig)),
-					xy=(rect.get_x() + rect.get_width() / 2, height),
-					xytext=(0, 3),  # 3 points vertical offset
-					textcoords="offset points",
-					ha='center', va='bottom')
-
-def autolabel(rects, ax):
-	"""Attach a text label above each bar in *rects*, displaying its height."""
-	for rect in rects:
-		height = rect.get_height()
 		sigdig = 1 if height > 10 else 2
 		ax.annotate('{}'.format(round(height,sigdig)),
 					xy=(rect.get_x() + rect.get_width() / 2, height),
@@ -480,7 +288,8 @@ def display_instructions():
 	print("Usage: %s ( i | <ndq> | <query> ) [ <data_dir> [ <java_tool_dir> ] ]" % sys.argv[0])
 	print(" First parameter required, either:")
 	print("    'i' - interactive mode (user enters queries interactively).")
-	print("    <ndq> - an integer, number of times to run default queries.  Times for runs are averaged.")
+	print("    <ndq> - an integer that specifies number of times to run default queries.  Times for runs are averaged.")
+	print("            It's good to use a multiple of six so all possible orders of the three tools are used.")
 	print("    <query> - a single query to execute; must be quoted.")
 	print(" After the first parameter, optionally specify:")
 	print("    <data_dir> - directory containing NWB files AND index file ('%s' built by build_index.py)" % index_file_name)
@@ -516,7 +325,8 @@ def main():
 	elif sys.argv[1].isdigit():
 		num_runs = int(sys.argv[1])
 		run_default_queries_repetitions(num_runs)
-	elif sys.argv[1][0] not in ('"', "'"):
+	elif ":" not in sys.argv[1]:
+		# query must contain a colon
 		display_instructions()
 	else:
 		query = sys.argv[1]
@@ -524,6 +334,5 @@ def main():
 
 
 if __name__ == "__main__":
-	test_plotting2()
-	# test_plot_ave_time_per_tool()
-	# main()
+	# test_plotting2()
+	main()
