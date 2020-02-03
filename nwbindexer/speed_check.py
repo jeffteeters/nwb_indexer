@@ -64,7 +64,7 @@ def make_tools_cmd(data_dir, index_file_path, java_tool_dir, java_cmd):
 	if java_tool_dir is not None:
 		tools_cmd.append({"name": "NWB Query Engine", "cmd": java_cmd_prefix + data_dir, "dir": java_tool_dir})
 	tools_cmd.append({"name": "search_nwb", "cmd": "python -m nwbindexer.search_nwb " + data_dir})
-	tools_cmd.append({"name": "query_index", "cmd": "python -m nwbindexer.query_index " + index_file_path })
+	tools_cmd.append({"name": "nwbindexer", "cmd": "python -m nwbindexer.query_index " + index_file_path })
 	# tools has list of tool names
 	tools = [tools_cmd[i]["name"] for i in range(len(tools_cmd))]
 
@@ -186,10 +186,12 @@ def plot_tool_times(tool_times):
 	# where:
 	# <tool_name> - string, name of the tool,
 	# <query_times> = [  (Q1_ave, Q1_min, Q1_max), (Q2_ave, Q2_min, Q2_max), ... ]
+	global alpha
 	num_queries = len(tool_times[0]["query_times"])
 	tool_names = [x["tool_name"] for x in tool_times]
 	num_tools = len(tool_names)
-	query_names = ["Q%s" % (i + 1) for i in range(num_queries)]
+	# query_names = ["Q%s" % (i + 1) for i in range(num_queries)]
+	query_names = [alpha[i] for i in range(num_queries)]
 	x = np.arange(len(query_names))*1.4  # the label locations
 	width = 0.35  # the width of the bars
 	all_bars_width = width * float(num_tools)
