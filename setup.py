@@ -8,7 +8,7 @@ setuptools.setup(
     version="0.1.2",
     author="Jeff Teeters",
     author_email="jeff@teeters.us",
-    description="Two tools for searching NWB files",
+    description="Two tools for searching data stored using the NWB (Neurodata Without Borders) format",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/jeffteeters/nwbindexer",
