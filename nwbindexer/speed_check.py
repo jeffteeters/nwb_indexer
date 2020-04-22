@@ -10,15 +10,21 @@ import resource
 import copy
 
 # for generating plot of timing results
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
+try:
+	import matplotlib
+	import matplotlib.pyplot as plt
+	import numpy as np
+	from pylab import rcParams
+	# from: https://stackoverflow.com/questions/332289/how-do-you-change-the-size-of-figures-drawn-with-matplotlib
+	rcParams['figure.figsize'] = 9, 5  # width, height of generated figure
+	have_matplotlib = True
+except ImportError:
+	have_matplotlib = False
+
 
 import datetime
 
-from pylab import rcParams
-# from: https://stackoverflow.com/questions/332289/how-do-you-change-the-size-of-figures-drawn-with-matplotlib
-rcParams['figure.figsize'] = 9, 5  # width, height of generated figure
+
 
 
 import pprint
@@ -150,6 +156,10 @@ def run_default_queries_repetitions(num_runs):
 
 def graph_rep_results(rep_results):
 	# calculate average results, also save min and max
+	global have_matplotlib
+	if not have_matplotlib:
+		print("Not plotting timing results because unable to import matplotlib")
+		return
 	num_runs = len(rep_results)
 	num_queries = len(rep_results[0]) - 1  # minus 1 for tool names
 	tool_names = rep_results[0][0]

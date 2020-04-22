@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
 
 setuptools.setup(
     name="nwbindexer",
-    version="0.1.2",
+    version="0.1.3",
     author="Jeff Teeters",
     author_email="jeff@teeters.us",
     description="Two tools for searching data stored using the NWB (Neurodata Without Borders) format",

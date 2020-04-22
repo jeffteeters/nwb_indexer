@@ -252,12 +252,12 @@ def get_file_id(location):
 		file_id = cur.lastrowid
 	return file_id
 
-def save_group(node, parent_id):
+def save_group(node, node_name, parent_id):
 	global con, cur, file_id, groups_with_colnames_attribute
-	base_name = node.name.split('/')[-1]
+	base_name = node_name.split('/')[-1]
 	name_id = get_name_id(base_name)
 	# only get path_id if this group has children (e.g. could be a parent in searches)
-	path_id = get_path_id(node.name) if len(node.attrs) > 0 or len(node.keys()) > 0 else None
+	path_id = get_path_id(node_name) if len(node.attrs) > 0 or len(node.keys()) > 0 else None
 	node_type = 'G' if "colnames" in node.attrs else 'g'
 	value_id = None
 	cur.execute("insert into node (file_id, parent_id, name_id, path_id, node_type, value_id)" +
@@ -272,29 +272,29 @@ def save_group(node, parent_id):
 			import pdb; pdb.set_trace()
 		groups_with_colnames_attribute[group_id] = [ v.decode("utf-8") for v in value]
 	# save attributes
-	save_node_attributes(node, group_id)
+	save_node_attributes(node, node_name, group_id)
 	return group_id
 
-def save_node_attributes(node, node_id):
+def save_node_attributes(node, node_name, node_id):
 	# save attributes for group or dataset
 	for key in sorted(node.attrs):
 		value = node.attrs[key]
-		save_attribute(node_id, key, value, node.name + "-" + key)
+		save_attribute(node_id, key, value, node_name + "-" + key)
 
-def save_dataset(node, parent_id, parent_node):
+def save_dataset(node, node_name, parent_id, parent_node):
 	global con, cur, file_id
-	base_name = node.name.split('/')[-1]
+	base_name = node_name.split('/')[-1]
 	name_id = get_name_id(base_name)
 	# only get path_id if this dataset has children (e.g. could be a parent in searches)
-	path_id = get_path_id(node.name) if len(node.attrs) > 0 else None	
-	value_id = get_value_id_from_dataset(node, base_name, parent_id, parent_node)
+	path_id = get_path_id(node_name) if len(node.attrs) > 0 else None
+	value_id = get_value_id_from_dataset(node, node_name, base_name, parent_id, parent_node)
 	node_type = "d"  # dataset
 	cur.execute("insert into node (file_id, parent_id, name_id, path_id, node_type, value_id)" +
 		" values (?, ?, ?, ?, ?, ?)", 
 			(file_id, parent_id, name_id, path_id, node_type, value_id))
 	dataset_id = cur.lastrowid
 	# save attributes
-	save_node_attributes(node, dataset_id)
+	save_node_attributes(node, node_name, dataset_id)
 	return dataset_id
 
 def save_attribute(parent_id, key, value, attribute_path):
@@ -307,20 +307,20 @@ def save_attribute(parent_id, key, value, attribute_path):
 		" values (?, ?, ?, ?, ?, ?)",
 		(file_id, parent_id, name_id, path_id, node_type, value_id))
 
-def get_node_id(node, parent_id, parent_node):
+def get_node_id(node, node_name, parent_id, parent_node):
 	if isinstance(node,h5py.Group):
-		node_id = save_group(node, parent_id)
+		node_id = save_group(node, node_name, parent_id)
 	elif isinstance(node,h5py.Dataset):
 		# check if this is an "_index" dataset, used with NWB 2.  If so, don't save it here since
 		# values will be appended to column(s) in the associated (target) dataset
 		if parent_id in groups_with_colnames_attribute:
-			base_name = node.name.split('/')[-1]
+			base_name = node_name.split('/')[-1]
 			if base_name.endswith("_index"):
 				assert base_name[:-len("_index")] in groups_with_colnames_attribute[parent_id], (
-					"Apperent nwb 2 _index dataset does not have associated target: %s" % node.name)
+					"Apperent nwb 2 _index dataset does not have associated target: %s" % node_name)
 				# found _index dataset with associated target dataset.  Don't save values here
 				return None
-		node_id = save_dataset(node, parent_id, parent_node)
+		node_id = save_dataset(node, node_name, parent_id, parent_node)
 	else:
 		sys.exit("Unknown node type in get_node_id: %s" % node)
 	return node_id
@@ -429,7 +429,7 @@ def get_value_id_from_attribute(value, attribute_path):
 	return value_id
 
 
-def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
+def get_value_id_from_dataset(node, node_name, base_name, parent_id, parent_node):
 	global fp, value_mirror, groups_with_colnames_attribute
 	global MAX_STRING_LENGTH, MAX_STRING_ARRAY_LENGTH, MAX_PACKED_STRING_LENGTH
 	global MAX_NWB2_TABLE_SIZE, MAX_NWB2_PACKED_STRING_LENGTH, MAX_NWB2_TABLE_NUMBER_OF_COLUMNS
@@ -441,13 +441,13 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 		if not (base_name == "id"
 			or base_name in groups_with_colnames_attribute[parent_id]):
 			# this should probably never happen
-			print ("dataset inside group with colnames not listed in colnames: %s" % node.name)
+			print ("dataset inside group with colnames not listed in colnames: %s" % node_name)
 			import pdb; pdb.set_trace()
 		# this dataset is part of a table, save it even if numeric
-		assert not scalar, "Found scalar value where table value expected, %s" % node.name
+		assert not scalar, "Found scalar value where table value expected, %s" % node_name
 		# check for "_index" dataset that is associated with this dataset
 		# "_index" dataset should not be saved directly here, or listed in colnames
-		assert not base_name.endswith("_index"), "dataset ends with _index, should not happen: %s" % node.name
+		assert not base_name.endswith("_index"), "dataset ends with _index, should not happen: %s" % node_name
 		index_name = base_name + "_index"
 		if index_name in parent_node:
 			index_dataset = parent_node[index_name]
@@ -473,14 +473,14 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			coldata = [ node[:,i] for i in range(node.shape[1]) ]
 			# in_table = True
 			sval, vtype = pack_values.pack(coldata, index_vals=index_values,
-				 col_names=colnames, in_table=True, node_path=node.name, fp=fp)
+				 col_names=colnames, in_table=True, node_path=node_name, fp=fp)
 			assert vtype == 'c'
 			nval = None
 		elif len(node.dtype) > 1:
 			# found compound type
 			if node.size * len(node.dtype) > MAX_NWB2_TABLE_SIZE:
 				print('Warning: not indexing compound type because too big (size=%i, limit=%i), at %s'
-					% (node.size * len(node.dtype), MAX_NWB2_TABLE_SIZE, node.name))
+					% (node.size * len(node.dtype), MAX_NWB2_TABLE_SIZE, node_name))
 				# don't save compound type if is too big
 				return None
 			colnames = []
@@ -490,7 +490,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				colnames.append(cn)
 				coldata.append(node[cn])
 			sval, vtype = pack_values.pack(coldata, index_vals=index_values,
-				 col_names=colnames, in_table=True, node_path=node.name, fp=fp)
+				 col_names=colnames, in_table=True, node_path=node_name, fp=fp)
 			nval = None
 			assert vtype == 'c'
 		elif np.issubdtype(node.dtype, np.number) or np.issubdtype(node.dtype, np.dtype(bool).type):
@@ -498,20 +498,20 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			if node.size > MAX_NWB2_TABLE_SIZE:
 				# don't save if larger than a threshold
 				print('Warning: not indexing numeric array because too big (size=%i, limit=%i), at %s' %
-				 (node.size, MAX_NWB2_TABLE_SIZE, node.name))
+				 (node.size, MAX_NWB2_TABLE_SIZE, node_name))
 				return None
 			sval, vtype = pack_values.pack([node[()],], index_vals=index_values,
-				 in_table=True, node_path=node.name, fp=fp)
+				 in_table=True, node_path=node_name, fp=fp)
 			assert vtype in ("I", "F", "J", "G")
 			nval =  None
 		elif np.issubdtype(node.dtype, np.character) or isinstance(node[0], h5py.Reference):
 			# found string dataset or object references (replaced by path to node)
 			sval, vtype = pack_values.pack([node[()],], index_vals=index_values,
-				 in_table=True, node_path=node.name, fp=fp)
+				 in_table=True, node_path=node_name, fp=fp)
 			if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
 				print("Warning: not indexing string array because too large "
 					"(packed size = %i, limit = %i), at '%s'" % (len(sval),
-						MAX_NWB2_PACKED_STRING_LENGTH, node.name))
+						MAX_NWB2_PACKED_STRING_LENGTH, node_name))
 				return None	
 			nval = None
 			assert vtype in ("M", "B")
@@ -519,19 +519,19 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			vlenType = h5py.check_dtype(vlen=node.dtype)
 			if vlenType in (bytes, str):
 				sval, vtype = pack_values.pack([node[()].tolist(),], index_vals=index_values,
-				 in_table=True, node_path=node.name, fp=fp)
+				 in_table=True, node_path=node_name, fp=fp)
 				assert vtype in ("M", "B")
 				nval = None
 				if len(sval) > MAX_NWB2_PACKED_STRING_LENGTH:
 					print("Warning: not indexing vlen string array because too large "
 					"(packed size = %i, limit = %i), at '%s'" % (len(sval),
-						MAX_NWB2_PACKED_STRING_LENGTH, node.name))
+						MAX_NWB2_PACKED_STRING_LENGTH, node_name))
 					# don't save if total length of string longer than a specific length
 					return None
 				nval = None
 				# vtype = "M"
 			else:
-				print ("unable to determine type of dataset value at: %s" % node.name)
+				print ("unable to determine type of dataset value at: %s" % node_name)
 				import pdb; pdb.set_trace()
 				return None
 	# not part of table
@@ -564,7 +564,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			# don't save if more than 20 elements in string array
 			return None
 		else:
-			sval, vtype = pack_values.pack([node[()].tolist(),], node_path=node.name, fp=fp)
+			sval, vtype = pack_values.pack([node[()].tolist(),], node_path=node_name, fp=fp)
 			if len(sval) > MAX_PACKED_STRING_LENGTH:
 				# don't save if total length of string longer than a specific length
 				return None
@@ -586,7 +586,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			else:
 				if node.len() > MAX_STRING_ARRAY_LENGTH:
 					return None
-				sval, vtype = pack_values.pack([node[()].tolist(),], node_path=node.name, fp=fp)
+				sval, vtype = pack_values.pack([node[()].tolist(),], node_path=node_name, fp=fp)
 				nval = None
 				if len(sval) > MAX_PACKED_STRING_LENGTH:
 					# don't save if total length of string longer than a specific length
@@ -603,7 +603,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 			nval = None
 			value = [fp[n].name for n in node[()]]
 			if len(value) > 1:
-				sval, vtype = pack_values.pack([ value, ], node_path=node.name, fp=fp)
+				sval, vtype = pack_values.pack([ value, ], node_path=node_name, fp=fp)
 				if len(sval) > MAX_PACKED_STRING_LENGTH:
 					# don't save if total length of string longer than a specific length
 					return None
@@ -612,7 +612,7 @@ def get_value_id_from_dataset(node, base_name, parent_id, parent_node):
 				sval = value[0]
 				vtype = 's'
 		else:
-			print ("unable to determine type of dataset value at: %s" % node.name)
+			print ("unable to determine type of dataset value at: %s" % node_name)
 			import pdb; pdb.set_trace()
 			return None
 	# if makes is here, should be able to get value_id
@@ -623,11 +623,11 @@ def visit_nodes(fp):
 	# visit all nodes (groups and datasets) in file
 	# fp is the h5py File object
 	# to_visit is a list of all nodes that need to visit
-	# each element is a tuple (node, parent_id, parent_node).  Start with root 
-	to_visit = [ (fp, None, None) ]
+	# each element is a tuple (node, node_name, parent_id, parent_node).  Start with root
+	to_visit = [ (fp, "", None, None) ]
 	while to_visit:
-		node, parent_id, parent_node = to_visit.pop(0)
-		node_id = get_node_id(node, parent_id, parent_node)
+		node, node_name, parent_id, parent_node = to_visit.pop(0)
+		node_id = get_node_id(node, node_name, parent_id, parent_node)
 		if isinstance(node,h5py.Group):
 			for child in sorted(node):
 				try:
@@ -635,7 +635,9 @@ def visit_nodes(fp):
 				except:
 					# unable to access this node.  Perhaps a broken external link.  Ignore
 					continue
-				to_visit.append( (cn, node_id, node))
+				base_name = cn.name.split('/')[-1]
+				cn_name = (node_name + "/" + base_name).lstrip("/")
+				to_visit.append( (cn, cn_name, node_id, node))
 
 def scan_file(path):
 	global file_id, con, fp

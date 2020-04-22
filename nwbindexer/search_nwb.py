@@ -135,9 +135,9 @@ def runsubquery(cpi, fp, qi, qr):
 	# store search results in qr, which is a results.File_result object (see file results.py).
 	# return True if search results found, False otherwise
 
-	def search_node(name, node):
+	def search_node(node_name, node):
 		# search one node, may be group or dataset
-		# name is ignored
+		# node_name - path to node in hdf5 file.  May be different from node.name if node is in an external linked file
 		# cpi - current ploc index, fp - h5py file pointer
 		# qi - query information, qr - container for query results
 		# sc search criteria
@@ -162,7 +162,7 @@ def runsubquery(cpi, fp, qi, qr):
 		found = get_row_values(node, ctypes, vtbl_res)
 		if found:
 			# found some results, save them
-			node_result = results.Node_result(node.name, vi_res, vtbl_res)
+			node_result = results.Node_result(node_name, vi_res, vtbl_res)
 			qr.add_node_result(node_result, cpi)
 			# qre["node"] = node.name
 			# qr[cpi].append(qre)
@@ -379,17 +379,38 @@ def runsubquery(cpi, fp, qi, qr):
 				result = False
 		return result
 
+	def visit_nodes(start_node):
+		# visit_nodes starting from start_node, calls search_node for each node
+		# this is a replacement for h5py visititems, which does not follow external links
+		# to_visit is a list of all nodes that need to visit
+		# each element is a double (node, node_name).
+		to_visit = [(start_node, start_node.name)]
+		while to_visit:
+			node, node_name = to_visit.pop(0)
+			search_node(node_name, node)
+			if isinstance(node,h5py.Group):
+				for child in sorted(node):
+					try:
+						cn = node[child]
+					except:
+						# unable to access this node.  Perhaps a broken external link.  Ignore.
+						continue
+					base_name = cn.name.split('/')[-1]
+					separator = "" if node_name.endswith('/') else "/"
+					cn_name = node_name + separator + base_name
+					to_visit.append( (cn, cn_name))
+
 	# start of main body of runsubqeury
 	sc = get_search_criteria(cpi, qi)
 	# print("sc = %s" % sc)
 	if sc['start_path'] not in fp:
-		# import pdb; pdb.set_trace()
 		# did not even find starting path in hdf5 file, cannot do search
 		return False
 	start_node = fp[sc['start_path']]
-	search_node(None, start_node)
 	if sc['search_all'] and isinstance(start_node,h5py.Group):
-		start_node.visititems(search_node)
+		visit_nodes(start_node)
+	else:
+		search_node(start_node.name, start_node)
 	# qr[cpi] = "cpi=%i, ploc=%s, sc=%s" % (cpi, qi["plocs"][cpi]["path"], sc)
 	found = qr.get_subquery_length(cpi) > 0	# will have length > 1 if result found
 	return found
